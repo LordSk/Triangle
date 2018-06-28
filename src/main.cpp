@@ -8,6 +8,7 @@
 #include "base.h"
 #include <bgfx/bgfx.h>
 #include <bgfx/platform.h>
+#include <imgui/bgfx_imgui.h>
 
 #define WINDOW_WIDTH 1600
 #define WINDOW_HEIGHT 900
@@ -66,7 +67,7 @@ bool init()
     init.deviceId = 0;
     init.resolution.width  = 1600;
     init.resolution.height = 900;
-    init.resolution.reset = BGFX_RESET_VSYNC;
+    init.resolution.reset = BGFX_RESET_NONE;
 
     if(!bgfx::init(init)) {
         LOG("ERROR> bgfx failed to initialize");
@@ -83,11 +84,14 @@ bool init()
         , 0
         );
 
+    imguiCreate();
+
     return true;
 }
 
 void cleanUp()
 {
+    imguiDestroy();
     bgfx::shutdown();
 }
 
@@ -123,6 +127,24 @@ void handleEvent(const SDL_Event& event)
 
 void update()
 {
+    i32 mx, my;
+    u32 mstate = SDL_GetMouseState(&mx, &my);
+    u8 buttons = 0;
+    if(mstate & SDL_BUTTON(SDL_BUTTON_LEFT)) {
+        buttons |= IMGUI_MBUT_LEFT;
+    }
+    if(mstate & SDL_BUTTON(SDL_BUTTON_RIGHT)) {
+        buttons |= IMGUI_MBUT_RIGHT;
+    }
+
+    // TODO: add scroll
+    imguiBeginFrame(mx, my, buttons, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+
+    // ui code here
+    ImGui::ShowDemoWindow();
+
+    imguiEndFrame();
+
     // Set view 0 default viewport.
     bgfx::setViewRect(0, 0, 0, u16(WINDOW_WIDTH), u16(WINDOW_HEIGHT));
 
