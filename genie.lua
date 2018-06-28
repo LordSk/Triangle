@@ -27,6 +27,11 @@ solution "Triangle solution"
 			"DEBUG",
 			"CONF_DEBUG"
 		}
+        links {
+            bimg_lib_debug,
+            bx_lib_debug,
+            bgfx_lib_debug,
+        }
 	
 	configuration {"Release"}
 		targetsuffix "_release"
@@ -37,6 +42,11 @@ solution "Triangle solution"
 			"NDEBUG",
 			"CONF_RELEASE"
 		}
+        links {
+            bimg_lib_release,
+            bx_lib_release,
+            bgfx_lib_release,
+        }
 	
 	configuration {}
 	
@@ -64,9 +74,6 @@ solution "Triangle solution"
 		"glu32",
 		"opengl32",
 		SDL2_lib,
-		bimg_lib,
-		bx_lib,
-		bgfx_lib,
 	}
 	
 	flags {

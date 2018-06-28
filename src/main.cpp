@@ -8,15 +8,88 @@
 #include "base.h"
 #include <bgfx/bgfx.h>
 #include <bgfx/platform.h>
+#include <bx/file.h>
 #include <imgui/bgfx_imgui.h>
 
 #define WINDOW_WIDTH 1600
 #define WINDOW_HEIGHT 900
 
+// TODO: move this
+bx::AllocatorI* getDefaultAllocator()
+{
+    static bx::DefaultAllocator g_allocator;
+    return &g_allocator;
+}
+
+bx::FileReader g_fileReader;
+bx::FileWriter g_fileWriter;
+
+static const bgfx::Memory* loadMem(bx::FileReaderI* _reader, const char* _filePath)
+{
+    if(bx::open(_reader, _filePath)) {
+        uint32_t size = (uint32_t)bx::getSize(_reader);
+        const bgfx::Memory* mem = bgfx::alloc(size+1);
+        bx::read(_reader, mem->data, size);
+        bx::close(_reader);
+        mem->data[mem->size-1] = '\0';
+        return mem;
+    }
+
+    LOG("Failed to load %s.", _filePath);
+    assert(0);
+    return NULL;
+}
+
+static bgfx::ShaderHandle loadShader(bx::FileReaderI* _reader, const char* _name)
+{
+    char filePath[512];
+
+    const char* ext = "???";
+
+    switch (bgfx::getRendererType() )
+    {
+        case bgfx::RendererType::Noop:
+        case bgfx::RendererType::Direct3D9:  ext = ".dx9";   break;
+        case bgfx::RendererType::Direct3D11:
+        case bgfx::RendererType::Direct3D12: ext = ".dx11";  break;
+        case bgfx::RendererType::Gnm:        ext = ".pssl";  break;
+        case bgfx::RendererType::Metal:      ext = ".metal"; break;
+        case bgfx::RendererType::OpenGL:     ext = ".glsl";  break;
+        case bgfx::RendererType::OpenGLES:   ext = ".essl";  break;
+        case bgfx::RendererType::Vulkan:     ext = ".spirv"; break;
+
+        case bgfx::RendererType::Count:
+            assert(0);
+            break;
+    }
+
+    bx::strCopy(filePath, BX_COUNTOF(filePath), _name);
+    bx::strCat(filePath, BX_COUNTOF(filePath), ext);
+
+    bgfx::ShaderHandle handle = bgfx::createShader(loadMem(_reader, filePath) );
+    bgfx::setName(handle, filePath);
+
+    return handle;
+}
+
+bgfx::ProgramHandle loadProgram(bx::FileReaderI* _reader, const char* _vsName, const char* _fsName)
+{
+    bgfx::ShaderHandle vsh = loadShader(_reader, _vsName);
+    bgfx::ShaderHandle fsh = BGFX_INVALID_HANDLE;
+    if (NULL != _fsName)
+    {
+        fsh = loadShader(_reader, _fsName);
+    }
+
+    return bgfx::createProgram(vsh, fsh, true /* destroy shaders when program is destroyed */);
+}
+
+
 struct Application {
 
 bool running = true;
 SDL_Window* window;
+bgfx::ProgramHandle programTest;
 
 bool init()
 {
@@ -31,7 +104,7 @@ bool init()
                               SDL_WINDOWPOS_CENTERED,
                               SDL_WINDOWPOS_CENTERED,
                               WINDOW_WIDTH, WINDOW_HEIGHT,
-                              SDL_WINDOW_OPENGL|SDL_WINDOW_SHOWN|
+                              /*SDL_WINDOW_OPENGL|*/SDL_WINDOW_SHOWN|
                               SDL_WINDOW_ALLOW_HIGHDPI);
 
     SDL_SysWMinfo wmi;
@@ -77,14 +150,11 @@ bool init()
     bgfx::setDebug(BGFX_DEBUG_TEXT);
 
     // Set view 0 clear state.
-    bgfx::setViewClear(0
-        , BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH
-        , 0x303030ff
-        , 1.0f
-        , 0
-        );
+    bgfx::setViewClear(0, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, 0x303030ff, 1.0f, 0);
 
     imguiCreate();
+
+    programTest = loadProgram(&g_fileReader, "vs_test", "fs_test");
 
     return true;
 }
@@ -143,7 +213,7 @@ void update()
     // ui code here
     ImGui::ShowDemoWindow();
 
-    imguiEndFrame();
+
 
     // Set view 0 default viewport.
     bgfx::setViewRect(0, 0, 0, u16(WINDOW_WIDTH), u16(WINDOW_HEIGHT));
@@ -159,14 +229,8 @@ void update()
     bgfx::dbgTextPrintf(80, 1, 0x0f, "\x1b[;0m    \x1b[;1m    \x1b[; 2m    \x1b[; 3m    \x1b[; 4m    \x1b[; 5m    \x1b[; 6m    \x1b[; 7m    \x1b[0m");
     bgfx::dbgTextPrintf(80, 2, 0x0f, "\x1b[;8m    \x1b[;9m    \x1b[;10m    \x1b[;11m    \x1b[;12m    \x1b[;13m    \x1b[;14m    \x1b[;15m    \x1b[0m");
 
-    const bgfx::Stats* stats = bgfx::getStats();
-    bgfx::dbgTextPrintf(0, 2, 0x0f, "Backbuffer %dW x %dH in pixels, debug text %dW x %dH in characters."
-        , stats->width
-        , stats->height
-        , stats->textWidth
-        , stats->textHeight
-        );
 
+    imguiEndFrame();
     // Advance to next frame. Rendering thread will be kicked to
     // process submitted rendering primitives.
     bgfx::frame();
