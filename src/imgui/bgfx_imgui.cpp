@@ -186,7 +186,7 @@ struct OcornutImguiContext
 
         io.DisplaySize = ImVec2(1280.0f, 720.0f);
         io.DeltaTime   = 1.0f / 60.0f;
-        io.IniFilename = NULL;
+        //io.IniFilename = "imgui.ini";
 
         setupStyle(true);
 
@@ -294,7 +294,7 @@ struct OcornutImguiContext
     void destroy()
     {
         //ImGui::ShutdownDockContext();
-        //ImGui::DestroyContext(m_imgui);
+        ImGui::DestroyContext(m_imgui);
 
         bgfx::destroy(s_tex);
         bgfx::destroy(m_texture);
