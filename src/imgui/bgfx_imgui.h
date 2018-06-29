@@ -1,6 +1,7 @@
 #pragma once
 
 #include <bgfx/bgfx.h>
+#include <SDL2/SDL_events.h>
 #include "imgui.h"
 
 #define IMGUI_MBUT_LEFT   0x01
@@ -22,8 +23,11 @@ namespace bx { struct AllocatorI; }
 void imguiCreate(float _fontSize = 18.0f, bx::AllocatorI* _allocator = NULL);
 void imguiDestroy();
 
-void imguiBeginFrame(int32_t _mx, int32_t _my, uint8_t _button, int32_t _scroll, uint16_t _width, uint16_t _height, char _inputChar = 0, bgfx::ViewId _view = 255);
+void imguiBeginFrame(int32_t _mx, int32_t _my, uint8_t _button, uint16_t _width, uint16_t _height,
+                     char _inputChar = 0, bgfx::ViewId _view = 255);
 void imguiEndFrame();
+
+void imguiHandleSDLEvent(const SDL_Event& event);
 
 namespace ImGui
 {

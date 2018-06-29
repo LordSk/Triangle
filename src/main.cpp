@@ -13,6 +13,8 @@
 #include <bx/timer.h>
 #include <imgui/bgfx_imgui.h>
 
+#include "static_mesh.h"
+
 #define WINDOW_WIDTH 1600
 #define WINDOW_HEIGHT 900
 
@@ -86,79 +88,18 @@ bgfx::ProgramHandle loadProgram(bx::FileReaderI* _reader, const char* _vsName, c
     return bgfx::createProgram(vsh, fsh, true /* destroy shaders when program is destroyed */);
 }
 
-struct PosColorVertex
-{
-    float m_x;
-    float m_y;
-    float m_z;
-    uint32_t m_abgr;
-
-    static void init()
-    {
-        ms_decl
-            .begin()
-            .add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
-            .add(bgfx::Attrib::Color0,   4, bgfx::AttribType::Uint8, true)
-            .end();
-    }
-
-    static bgfx::VertexDecl ms_decl;
-};
-
 bgfx::VertexDecl PosColorVertex::ms_decl;
-
-static PosColorVertex s_cubeVertices[] =
-{
-    {-1.0f,  1.0f,  1.0f, 0xff000000 },
-    { 1.0f,  1.0f,  1.0f, 0xff0000ff },
-    {-1.0f, -1.0f,  1.0f, 0xff00ff00 },
-    { 1.0f, -1.0f,  1.0f, 0xff00ffff },
-    {-1.0f,  1.0f, -1.0f, 0xffff0000 },
-    { 1.0f,  1.0f, -1.0f, 0xffff00ff },
-    {-1.0f, -1.0f, -1.0f, 0xffffff00 },
-    { 1.0f, -1.0f, -1.0f, 0xffffffff },
-};
-
-static const uint16_t s_cubeTriList[] =
-{
-    0, 1, 2, // 0
-    1, 3, 2,
-    4, 6, 5, // 2
-    5, 6, 7,
-    0, 2, 4, // 4
-    4, 2, 6,
-    1, 5, 3, // 6
-    5, 7, 3,
-    0, 4, 1, // 8
-    4, 5, 1,
-    2, 3, 6, // 10
-    6, 3, 7,
-};
-
-static const uint16_t s_cubeTriStrip[] =
-{
-    0, 1, 2,
-    3,
-    7,
-    1,
-    5,
-    0,
-    4,
-    2,
-    6,
-    7,
-    4,
-    5,
-};
 
 struct Application {
 
 bool running = true;
 SDL_Window* window;
 bgfx::ProgramHandle programTest;
+bgfx::ProgramHandle programVertShading;
 bgfx::VertexBufferHandle vbh;
-bgfx::IndexBufferHandle ibh;
 i64 timeOffset;
+
+f32 dbgRotate;
 
 bool init()
 {
@@ -229,17 +170,12 @@ bool init()
     // Create static vertex buffer.
     vbh = bgfx::createVertexBuffer(
             // Static data can be passed with bgfx::makeRef
-            bgfx::makeRef(s_cubeVertices, sizeof(s_cubeVertices)),
+            bgfx::makeRef(s_cubeRainbowMesh, sizeof(s_cubeRainbowMesh)),
             PosColorVertex::ms_decl
             );
 
-    // Create static index buffer.
-    ibh = bgfx::createIndexBuffer(
-            // Static data can be passed with bgfx::makeRef
-            bgfx::makeRef(s_cubeTriStrip, sizeof(s_cubeTriStrip))
-            );
-
     programTest = loadProgram(&g_fileReader, "vs_test", "fs_test");
+    programVertShading = loadProgram(&g_fileReader, "vs_vertex_shading", "fs_vertex_shading");
 
     timeOffset = bx::getHPCounter();
 
@@ -250,7 +186,6 @@ void cleanUp()
 {
     imguiDestroy();
 
-    bgfx::destroy(ibh);
     bgfx::destroy(vbh);
     bgfx::destroy(programTest);
 
@@ -274,6 +209,8 @@ i32 run()
 
 void handleEvent(const SDL_Event& event)
 {
+    imguiHandleSDLEvent(event);
+
     if(event.type == SDL_QUIT) {
         running = false;
         return;
@@ -300,21 +237,26 @@ void update()
     }
 
     // TODO: add scroll
-    imguiBeginFrame(mx, my, buttons, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+    imguiBeginFrame(mx, my, buttons, WINDOW_WIDTH, WINDOW_HEIGHT);
 
     // ui code here
     ImGui::ShowDemoWindow();
+
+    ImGui::Begin("Test");
+    ImGui::SliderAngle("rotate", &dbgRotate);
+    ImGui::End();
 
     imguiEndFrame();
 
 
     float at[3]  = { 0.0f, 0.0f,   0.0f };
-    float eye[3] = { 0.0f, 0.0f, -35.0f };
+    float eye[3] = { 0.0f, -35.0f, 0.0f };
+    float up[3] =  { 0.0f, 0.0f, 1.0f };
     float view[16];
-    bx::mtxLookAt(view, eye, at);
+    bx::mtxLookAt(view, eye, at, up);
 
     float proj[16];
-    bx::mtxProj(proj, 60.0f, float(WINDOW_WIDTH)/float(WINDOW_HEIGHT), 0.1f, 100.0f,
+    bx::mtxProj(proj, 60.0f, f32(WINDOW_WIDTH)/f32(WINDOW_HEIGHT), 0.1f, 100.0f,
                 bgfx::getCaps()->homogeneousDepth);
     bgfx::setViewTransform(0, view, proj);
 
@@ -327,36 +269,33 @@ void update()
 
     float time = (float)( (bx::getHPCounter()-timeOffset)/double(bx::getHPFrequency() ) );
 
-    for(uint32_t yy = 0; yy < 11; ++yy) {
-        for(uint32_t xx = 0; xx < 11; ++xx) {
-            float mtx[16];
+    for(u32 yy = 0; yy < 11; ++yy) {
+        for(u32 xx = 0; xx < 11; ++xx) {
+            f32 mtx[16];
+            bx::mtxIdentity(mtx);
             bx::mtxRotateXY(mtx, time + xx*0.21f, time + yy*0.37f);
-            mtx[12] = -15.0f + float(xx)*3.0f;
-            mtx[13] = -15.0f + float(yy)*3.0f;
-            mtx[14] = 0.0f;
+            //bx::mtxRotateZ(mtx, dbgRotate);
+            mtx[12] = -15.0f + f32(xx)*3.0f;
+            mtx[13] = 0.0f;
+            mtx[14] = -15.0f + f32(yy)*3.0f;
 
             // Set model matrix for rendering.
             bgfx::setTransform(mtx);
 
             // Set vertex and index buffer.
-            bgfx::setVertexBuffer(0, vbh);
-            bgfx::setIndexBuffer(ibh);
+            bgfx::setVertexBuffer(0, vbh, 0, BX_COUNTOF(s_cubeRainbowMesh));
 
             // Set render states.
             bgfx::setState(0
-                | BGFX_STATE_WRITE_R
-                | BGFX_STATE_WRITE_G
-                | BGFX_STATE_WRITE_B
-                | BGFX_STATE_WRITE_A
-                | BGFX_STATE_WRITE_Z
+                | BGFX_STATE_WRITE_MASK
                 | BGFX_STATE_DEPTH_TEST_LESS
-                | BGFX_STATE_CULL_CW
+                | BGFX_STATE_CULL_CCW
                 | BGFX_STATE_MSAA
-                | BGFX_STATE_PT_TRISTRIP
+                //| BGFX_STATE_PT_TRIANGLES (is triangles by default)
                 );
 
             // Submit primitive for rendering to view 0.
-            bgfx::submit(0, programTest);
+            bgfx::submit(0, programVertShading);
         }
     }
 

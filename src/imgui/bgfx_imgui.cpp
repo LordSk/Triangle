@@ -20,6 +20,8 @@
 #include "roboto_regular.ttf.h"
 #include "robotomono_regular.ttf.h"
 
+#include <SDL2/SDL_scancode.h>
+
 static const bgfx::EmbeddedShader s_embeddedShaders[] =
 {
     BGFX_EMBEDDED_SHADER(vs_ocornut_imgui),
@@ -175,7 +177,6 @@ struct OcornutImguiContext
         }
 
         m_viewId = 255;
-        m_lastScroll = 0;
         m_last = bx::getHPCounter();
 
         ImGui::SetAllocatorFunctions(memAlloc, memFree, NULL);
@@ -190,29 +191,27 @@ struct OcornutImguiContext
 
         setupStyle(true);
 
-#if USE_ENTRY
-        io.KeyMap[ImGuiKey_Tab]        = (int)entry::Key::Tab;
-        io.KeyMap[ImGuiKey_LeftArrow]  = (int)entry::Key::Left;
-        io.KeyMap[ImGuiKey_RightArrow] = (int)entry::Key::Right;
-        io.KeyMap[ImGuiKey_UpArrow]    = (int)entry::Key::Up;
-        io.KeyMap[ImGuiKey_DownArrow]  = (int)entry::Key::Down;
-        io.KeyMap[ImGuiKey_PageUp]     = (int)entry::Key::PageUp;
-        io.KeyMap[ImGuiKey_PageDown]   = (int)entry::Key::PageDown;
-        io.KeyMap[ImGuiKey_Home]       = (int)entry::Key::Home;
-        io.KeyMap[ImGuiKey_End]        = (int)entry::Key::End;
-        io.KeyMap[ImGuiKey_Insert]     = (int)entry::Key::Insert;
-        io.KeyMap[ImGuiKey_Delete]     = (int)entry::Key::Delete;
-        io.KeyMap[ImGuiKey_Backspace]  = (int)entry::Key::Backspace;
-        io.KeyMap[ImGuiKey_Space]      = (int)entry::Key::Space;
-        io.KeyMap[ImGuiKey_Enter]      = (int)entry::Key::Return;
-        io.KeyMap[ImGuiKey_Escape]     = (int)entry::Key::Esc;
-        io.KeyMap[ImGuiKey_A]          = (int)entry::Key::KeyA;
-        io.KeyMap[ImGuiKey_C]          = (int)entry::Key::KeyC;
-        io.KeyMap[ImGuiKey_V]          = (int)entry::Key::KeyV;
-        io.KeyMap[ImGuiKey_X]          = (int)entry::Key::KeyX;
-        io.KeyMap[ImGuiKey_Y]          = (int)entry::Key::KeyY;
-        io.KeyMap[ImGuiKey_Z]          = (int)entry::Key::KeyZ;
+        io.KeyMap[ImGuiKey_Tab] = SDL_SCANCODE_TAB;
+        io.KeyMap[ImGuiKey_LeftArrow] = SDL_SCANCODE_LEFT;
+        io.KeyMap[ImGuiKey_RightArrow] = SDL_SCANCODE_RIGHT;
+        io.KeyMap[ImGuiKey_UpArrow] = SDL_SCANCODE_UP;
+        io.KeyMap[ImGuiKey_DownArrow] = SDL_SCANCODE_DOWN;
+        io.KeyMap[ImGuiKey_PageUp] = SDL_SCANCODE_PAGEUP;
+        io.KeyMap[ImGuiKey_PageDown] = SDL_SCANCODE_PAGEDOWN;
+        io.KeyMap[ImGuiKey_Home] = SDL_SCANCODE_HOME;
+        io.KeyMap[ImGuiKey_End] = SDL_SCANCODE_END;
+        io.KeyMap[ImGuiKey_Delete] = SDL_SCANCODE_DELETE;
+        io.KeyMap[ImGuiKey_Backspace] = SDL_SCANCODE_BACKSPACE;
+        io.KeyMap[ImGuiKey_Enter] = SDL_SCANCODE_RETURN;
+        io.KeyMap[ImGuiKey_Escape] = SDL_SCANCODE_ESCAPE;
+        io.KeyMap[ImGuiKey_A] = SDL_SCANCODE_A;
+        io.KeyMap[ImGuiKey_C] = SDL_SCANCODE_C;
+        io.KeyMap[ImGuiKey_V] = SDL_SCANCODE_V;
+        io.KeyMap[ImGuiKey_X] = SDL_SCANCODE_X;
+        io.KeyMap[ImGuiKey_Y] = SDL_SCANCODE_Y;
+        io.KeyMap[ImGuiKey_Z] = SDL_SCANCODE_Z;
 
+#if 0
         io.ConfigFlags |= 0
             | ImGuiConfigFlags_NavEnableGamepad
             | ImGuiConfigFlags_NavEnableKeyboard
@@ -234,7 +233,7 @@ struct OcornutImguiContext
 //		io.NavInputs[ImGuiNavInput_FocusNext]   = (int)entry::Key::;
 //		io.NavInputs[ImGuiNavInput_TweakSlow]   = (int)entry::Key::;
 //		io.NavInputs[ImGuiNavInput_TweakFast]   = (int)entry::Key::;
-#endif // USE_ENTRY
+#endif
 
         bgfx::RendererType::Enum type = bgfx::getRendererType();
         m_program = bgfx::createProgram(
@@ -328,7 +327,6 @@ struct OcornutImguiContext
           int32_t _mx
         , int32_t _my
         , uint8_t _button
-        , int32_t _scroll
         , int _width
         , int _height
         , char _inputChar
@@ -355,8 +353,6 @@ struct OcornutImguiContext
         io.MouseDown[0] = 0 != (_button & IMGUI_MBUT_LEFT);
         io.MouseDown[1] = 0 != (_button & IMGUI_MBUT_RIGHT);
         io.MouseDown[2] = 0 != (_button & IMGUI_MBUT_MIDDLE);
-        io.MouseWheel = (float)(_scroll - m_lastScroll);
-        m_lastScroll = _scroll;
 
 #if USE_ENTRY
         uint8_t modifiers = inputGetModifiersState();
@@ -392,7 +388,6 @@ struct OcornutImguiContext
     bgfx::UniformHandle u_imageLodEnabled;
     ImFont* m_font[ImGui::Font::Count];
     int64_t m_last;
-    int32_t m_lastScroll;
     bgfx::ViewId m_viewId;
 };
 
@@ -420,14 +415,84 @@ void imguiDestroy()
     s_ctx.destroy();
 }
 
-void imguiBeginFrame(int32_t _mx, int32_t _my, uint8_t _button, int32_t _scroll, uint16_t _width, uint16_t _height, char _inputChar, bgfx::ViewId _viewId)
+void imguiBeginFrame(int32_t _mx, int32_t _my, uint8_t _button, uint16_t _width,
+                     uint16_t _height, char _inputChar, bgfx::ViewId _viewId)
 {
-    s_ctx.beginFrame(_mx, _my, _button, _scroll, _width, _height, _inputChar, _viewId);
+    s_ctx.beginFrame(_mx, _my, _button, _width, _height, _inputChar, _viewId);
 }
 
 void imguiEndFrame()
 {
     s_ctx.endFrame();
+}
+
+void imguiHandleSDLEvent(const SDL_Event& event)
+{
+    ImGuiIO& io = ImGui::GetIO();
+
+    if(event.type == SDL_MOUSEWHEEL) {
+        io.MouseWheel = event.wheel.y;
+        return;
+    }
+
+    if(event.type == SDL_KEYDOWN) {
+        io.KeysDown[event.key.keysym.scancode] = true;
+
+        if(event.key.keysym.scancode == SDL_SCANCODE_KP_ENTER) {
+            io.KeysDown[io.KeyMap[ImGuiKey_Enter]] = true;
+        }
+
+        if(event.key.keysym.scancode == SDL_SCANCODE_LCTRL ||
+           event.key.keysym.scancode == SDL_SCANCODE_RCTRL) {
+            io.KeyCtrl = true;
+        }
+        if(event.key.keysym.scancode == SDL_SCANCODE_LSHIFT ||
+           event.key.keysym.scancode == SDL_SCANCODE_RSHIFT) {
+            io.KeyShift = true;
+        }
+        if(event.key.keysym.scancode == SDL_SCANCODE_LALT ||
+           event.key.keysym.scancode == SDL_SCANCODE_RALT) {
+            io.KeyAlt = true;
+        }
+
+        if(event.key.keysym.mod & KMOD_CTRL) {
+            io.KeyCtrl = true;
+        }
+        if(event.key.keysym.mod & KMOD_ALT) {
+            io.KeyAlt = true;
+        }
+        if(event.key.keysym.mod & KMOD_SHIFT) {
+            io.KeyShift = true;
+        }
+        return;
+    }
+
+    if(event.type == SDL_KEYUP) {
+        io.KeysDown[event.key.keysym.scancode] = false;
+
+        if(event.key.keysym.scancode == SDL_SCANCODE_KP_ENTER) {
+            io.KeysDown[io.KeyMap[ImGuiKey_Enter]] = false;
+        }
+
+        if(event.key.keysym.scancode == SDL_SCANCODE_LCTRL ||
+           event.key.keysym.scancode == SDL_SCANCODE_RCTRL) {
+            io.KeyCtrl = false;
+        }
+        if(event.key.keysym.scancode == SDL_SCANCODE_LSHIFT ||
+           event.key.keysym.scancode == SDL_SCANCODE_RSHIFT) {
+            io.KeyShift = false;
+        }
+        if(event.key.keysym.scancode == SDL_SCANCODE_LALT ||
+           event.key.keysym.scancode == SDL_SCANCODE_RALT) {
+            io.KeyAlt = false;
+        }
+        return;
+    }
+
+    if(event.type == SDL_TEXTINPUT) {
+        io.AddInputCharactersUTF8(event.text.text);
+        return;
+    }
 }
 
 namespace ImGui
