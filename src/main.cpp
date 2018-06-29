@@ -96,6 +96,8 @@ bool running = true;
 SDL_Window* window;
 bgfx::ProgramHandle programTest;
 bgfx::ProgramHandle programVertShading;
+bgfx::ProgramHandle programVertShadingColor;
+bgfx::UniformHandle u_color;
 bgfx::VertexBufferHandle vbh;
 i64 timeOffset;
 
@@ -174,8 +176,10 @@ bool init()
             PosColorVertex::ms_decl
             );
 
+    u_color = bgfx::createUniform("u_color", bgfx::UniformType::Vec4);
     programTest = loadProgram(&g_fileReader, "vs_test", "fs_test");
     programVertShading = loadProgram(&g_fileReader, "vs_vertex_shading", "fs_vertex_shading");
+    programVertShadingColor = loadProgram(&g_fileReader, "vs_vertex_shading", "fs_vertex_shading_color");
 
     timeOffset = bx::getHPCounter();
 
@@ -188,6 +192,9 @@ void cleanUp()
 
     bgfx::destroy(vbh);
     bgfx::destroy(programTest);
+    bgfx::destroy(programVertShading);
+    bgfx::destroy(programVertShadingColor);
+    bgfx::destroy(u_color);
 
     bgfx::shutdown();
 }
@@ -295,7 +302,9 @@ void update()
                 );
 
             // Submit primitive for rendering to view 0.
-            bgfx::submit(0, programVertShading);
+            const f32 color[] = {1, 1, 1, 1};
+            bgfx::setUniform(u_color, color);
+            bgfx::submit(0, programVertShadingColor);
         }
     }
 
