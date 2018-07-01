@@ -8,22 +8,18 @@
 #include "base.h"
 #include <bgfx/bgfx.h>
 #include <bgfx/platform.h>
-#include <bx/file.h>
 #include <bx/math.h>
+#include <bx/file.h>
 #include <bx/timer.h>
 #include <imgui/bgfx_imgui.h>
 
 #include "static_mesh.h"
+#include "mesh_load.h"
 
 #define WINDOW_WIDTH 1600
 #define WINDOW_HEIGHT 900
 
 // TODO: move this
-bx::AllocatorI* getDefaultAllocator()
-{
-    static bx::DefaultAllocator g_allocator;
-    return &g_allocator;
-}
 
 bx::FileReader g_fileReader;
 bx::FileWriter g_fileWriter;
@@ -97,11 +93,18 @@ SDL_Window* window;
 bgfx::ProgramHandle programTest;
 bgfx::ProgramHandle programVertShading;
 bgfx::ProgramHandle programVertShadingColor;
+bgfx::ProgramHandle programDbgColor;
 bgfx::UniformHandle u_color;
-bgfx::VertexBufferHandle vbh;
+bgfx::VertexBufferHandle cubeVbh;
+bgfx::VertexBufferHandle originVbh;
 i64 timeOffset;
 
-f32 dbgRotate;
+MeshHandle playerShipMesh;
+
+f32 dbgRotateX;
+f32 dbgRotateY;
+f32 dbgRotateZ;
+f32 dbgScale = 1;
 
 bool init()
 {
@@ -170,9 +173,14 @@ bool init()
     PosColorVertex::init();
 
     // Create static vertex buffer.
-    vbh = bgfx::createVertexBuffer(
+    cubeVbh = bgfx::createVertexBuffer(
             // Static data can be passed with bgfx::makeRef
-            bgfx::makeRef(s_cubeRainbowMesh, sizeof(s_cubeRainbowMesh)),
+            bgfx::makeRef(s_cubeRainbowVertData, sizeof(s_cubeRainbowVertData)),
+            PosColorVertex::ms_decl
+            );
+    originVbh = bgfx::createVertexBuffer(
+            // Static data can be passed with bgfx::makeRef
+            bgfx::makeRef(s_originVertData, sizeof(s_originVertData)),
             PosColorVertex::ms_decl
             );
 
@@ -180,8 +188,13 @@ bool init()
     programTest = loadProgram(&g_fileReader, "vs_test", "fs_test");
     programVertShading = loadProgram(&g_fileReader, "vs_vertex_shading", "fs_vertex_shading");
     programVertShadingColor = loadProgram(&g_fileReader, "vs_vertex_shading", "fs_vertex_shading_color");
+    programDbgColor = loadProgram(&g_fileReader, "vs_dbg_color", "fs_dbg_color");
 
     timeOffset = bx::getHPCounter();
+
+    if(!(playerShipMesh = meshLoad("assets/player_ship.mesh", &g_fileReader))) {
+        return false;
+    }
 
     return true;
 }
@@ -190,10 +203,12 @@ void cleanUp()
 {
     imguiDestroy();
 
-    bgfx::destroy(vbh);
+    meshUnload(playerShipMesh);
+    bgfx::destroy(cubeVbh);
     bgfx::destroy(programTest);
     bgfx::destroy(programVertShading);
     bgfx::destroy(programVertShadingColor);
+    bgfx::destroy(programDbgColor);
     bgfx::destroy(u_color);
 
     bgfx::shutdown();
@@ -250,20 +265,23 @@ void update()
     ImGui::ShowDemoWindow();
 
     ImGui::Begin("Test");
-    ImGui::SliderAngle("rotate", &dbgRotate);
+    ImGui::SliderAngle("x", &dbgRotateX);
+    ImGui::SliderAngle("y", &dbgRotateY);
+    ImGui::SliderAngle("z", &dbgRotateZ);
+    ImGui::SliderFloat("scale", &dbgScale, 0.1, 100);
     ImGui::End();
 
     imguiEndFrame();
 
 
     float at[3]  = { 0.0f, 0.0f,   0.0f };
-    float eye[3] = { 0.0f, -35.0f, 0.0f };
+    float eye[3] = { 10.0f, -35.0f, 10.0f };
     float up[3] =  { 0.0f, 0.0f, 1.0f };
     float view[16];
-    bx::mtxLookAt(view, eye, at, up);
+    bx::mtxLookAtRh(view, eye, at, up);
 
     float proj[16];
-    bx::mtxProj(proj, 60.0f, f32(WINDOW_WIDTH)/f32(WINDOW_HEIGHT), 0.1f, 100.0f,
+    bx::mtxProjRh(proj, 60.0f, f32(WINDOW_WIDTH)/f32(WINDOW_HEIGHT), 0.1f, 100.0f,
                 bgfx::getCaps()->homogeneousDepth);
     bgfx::setViewTransform(0, view, proj);
 
@@ -273,6 +291,18 @@ void update()
     // This dummy draw call is here to make sure that view 0 is cleared
     // if no other draw calls are submitted to view 0.
     bgfx::touch(0);
+
+    bgfx::setState(0
+        | BGFX_STATE_WRITE_MASK
+        | BGFX_STATE_DEPTH_TEST_LESS
+        | BGFX_STATE_MSAA
+        | BGFX_STATE_PT_LINES
+        );
+
+    const f32 transparent[] = {0, 0, 0, 0};
+    bgfx::setUniform(u_color, transparent);
+    bgfx::setVertexBuffer(0, originVbh, 0, BX_COUNTOF(s_originVertData));
+    bgfx::submit(0, programDbgColor);
 
     float time = (float)( (bx::getHPCounter()-timeOffset)/double(bx::getHPFrequency() ) );
 
@@ -290,7 +320,7 @@ void update()
             bgfx::setTransform(mtx);
 
             // Set vertex and index buffer.
-            bgfx::setVertexBuffer(0, vbh, 0, BX_COUNTOF(s_cubeRainbowMesh));
+            bgfx::setVertexBuffer(0, cubeVbh, 0, BX_COUNTOF(s_cubeRainbowVertData));
 
             // Set render states.
             bgfx::setState(0
@@ -307,6 +337,16 @@ void update()
             bgfx::submit(0, programVertShadingColor);
         }
     }
+
+    const f32 color[] = {1, 0, 0, 1};
+    bgfx::setUniform(u_color, color);
+
+    f32 mtx[16];
+    bx::mtxRotateXYZ(mtx, dbgRotateX, dbgRotateY, dbgRotateZ);
+    f32 mtxScale[16];
+    bx::mtxScale(mtxScale, dbgScale);
+    bx::mtxMul(mtx, mtx, mtxScale);
+    meshSubmit(playerShipMesh, 0, programVertShadingColor, mtx, BGFX_STATE_MASK);
 
     // Advance to next frame. Rendering thread will be kicked to
     // process submitted rendering primitives.

@@ -27,7 +27,19 @@ struct PosColorVertex
 
 #endif
 
-static PosColorVertex s_cubeRainbowMesh[] =
+static PosColorVertex s_originVertData[] =
+{
+    {0, 0, 0, 0xffff0000 },
+    {10, 0, 0, 0xffff0000 },
+
+    {0, 0, 0, 0xff00ff00 },
+    {0, 10, 0, 0xff00ff00 },
+
+    {0, 0, 0, 0xff0000ff },
+    {0, 0, 10, 0xff0000ff },
+};
+
+static PosColorVertex s_cubeRainbowVertData[] =
 {
     // right
     {-1.0f, -1.0f, -1.0f, 0xffffff00, -1.0f, 0.0f, 0.0f },

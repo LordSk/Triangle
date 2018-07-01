@@ -57,6 +57,7 @@ solution "Triangle solution"
 		SDL2_include,
 		bx_include,
 		bgfx_include,
+        bgfx_3rdparty_include
 	}
 	
 	links {
@@ -83,9 +84,11 @@ solution "Triangle solution"
 		"EnableSSE2",
 		"EnableAVX",
 		"EnableAVX2",
+        "StaticRuntime"
 	}
 	
 	defines {
+        "_HAS_ITERATOR_DEBUGGING=0"
 	}
 	
 	-- disable exception related warnings
@@ -101,6 +104,7 @@ project "Triangle"
 		"src/**.h",
 		"src/**.c",
 		"src/**.cpp",
+        ib_compress_src
 	}
     
     linkoptions{ "/subsystem:windows" }

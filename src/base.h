@@ -74,3 +74,12 @@ inline void swap(T* t1, T* t2)
 }
 
 #define arr_count(a) (sizeof(a)/sizeof(a[0]))
+
+#include <bx/allocator.h>
+
+inline bx::AllocatorI* getDefaultAllocator()
+{
+    static bx::DefaultAllocator g_allocator;
+    return &g_allocator;
+}
+
