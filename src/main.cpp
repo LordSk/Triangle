@@ -11,10 +11,14 @@
 #include <bx/math.h>
 #include <bx/file.h>
 #include <bx/timer.h>
+#include <bx/rng.h>
 #include <imgui/bgfx_imgui.h>
 
 #include "static_mesh.h"
 #include "mesh_load.h"
+#include "player_ship.h"
+
+#include <vector>
 
 #define WINDOW_WIDTH 1600
 #define WINDOW_HEIGHT 900
@@ -23,6 +27,7 @@
 
 bx::FileReader g_fileReader;
 bx::FileWriter g_fileWriter;
+bx::RngMwc g_rng;
 
 static const bgfx::Memory* loadMem(bx::FileReaderI* _reader, const char* _filePath)
 {
@@ -86,6 +91,168 @@ bgfx::ProgramHandle loadProgram(bx::FileReaderI* _reader, const char* _vsName, c
 
 bgfx::VertexDecl PosColorVertex::ms_decl;
 
+struct Transform
+{
+    vec3 pos, scale;
+    quat rot;
+};
+
+struct Room
+{
+    vec3 size;
+    std::vector<Transform> cubeTransforms;
+
+    void make(vec3 size_) {
+        size = vec3{bx::ceil(size_.x), bx::ceil(size_.y), bx::ceil(size_.z)};
+        i32 width = size.x/2;
+        i32 height = size.y/2;
+
+        for(i32 y = 0; y < width; y++) {
+            for(i32 x = 0; x < height; x++) {
+                Transform tf;
+                tf.pos.x = x * 2;
+                tf.pos.y = y * 2;
+                tf.pos.z = bx::frnd(&g_rng);
+                tf.scale = {1, 1, 1};
+                bx::quatIdentity(tf.rot);
+                cubeTransforms.push_back(tf);
+            }
+        }
+    }
+};
+
+struct Camera
+{
+    vec3 pos = {0, 0, 10};
+    vec3 dir = {1, 0, 0};
+    vec3 up = {0, 0, 1};
+    quat rot;
+    f32 speed = 30;
+    i8 inputForward = 0; // -1 == backward
+    i8 inputRight = 0; // -1 == left
+    i8 inputUp = 0; // -1 == down
+
+    void handleEvent(const SDL_Event& event) {
+        if(event.type == SDL_KEYDOWN) {
+            if(event.key.keysym.sym == SDLK_z) {
+                if(inputForward == 0) {
+                    inputForward = 1;
+                }
+                return;
+            }
+            if(event.key.keysym.sym == SDLK_s) {
+                if(inputForward == 0) {
+                    inputForward = -1;
+                }
+                return;
+            }
+            if(event.key.keysym.sym == SDLK_a) {
+                if(inputUp == 0) {
+                    inputUp = 1;
+                }
+                return;
+            }
+            if(event.key.keysym.sym == SDLK_e) {
+                if(inputUp == 0) {
+                    inputUp = -1;
+                }
+                return;
+            }
+            if(event.key.keysym.sym == SDLK_q) {
+                if(inputRight == 0) {
+                    inputRight = -1;
+                }
+                return;
+            }
+            if(event.key.keysym.sym == SDLK_d) {
+                if(inputRight == 0) {
+                    inputRight = 1;
+                }
+                return;
+            }
+        }
+        if(event.type == SDL_KEYUP) {
+            if(event.key.keysym.sym == SDLK_z) {
+                if(inputForward == 1) {
+                    inputForward = 0;
+                }
+                return;
+            }
+            if(event.key.keysym.sym == SDLK_s) {
+                if(inputForward == -1) {
+                    inputForward = 0;
+                }
+                return;
+            }
+            if(event.key.keysym.sym == SDLK_a) {
+                if(inputUp == 1) {
+                    inputUp = 0;
+                }
+                return;
+            }
+            if(event.key.keysym.sym == SDLK_e) {
+                if(inputUp == -1) {
+                    inputUp = 0;
+                }
+                return;
+            }
+            if(event.key.keysym.sym == SDLK_q) {
+                if(inputRight == -1) {
+                    inputRight = 0;
+                }
+                return;
+            }
+            if(event.key.keysym.sym == SDLK_d) {
+                if(inputRight == 1) {
+                    inputRight = 0;
+                }
+                return;
+            }
+        }
+
+        if(event.type == SDL_MOUSEMOTION) {
+            // TODO: move this to applyInput
+            vec3 right;
+            bx::vec3Cross(right, dir, up);
+            quat qyaw;
+            quat qpitch;
+            bx::quatRotateAxis(qyaw, up, event.motion.xrel / (bx::kPi2 * 100.0));
+            bx::quatRotateAxis(qpitch, right, event.motion.yrel / (bx::kPi2 * 100.0));
+            bx::quatMul(rot, qyaw, qpitch);
+            bx::quatNorm(rot, rot);
+            bx::vec3MulQuat(dir, dir, rot);
+            bx::vec3Norm(dir, dir);
+            return;
+        }
+    }
+
+    void applyInput(f64 delta) {
+        vec3 right;
+        bx::vec3Cross(right, dir, up);
+
+        if(inputForward > 0) {
+            pos += dir * speed * delta;
+        }
+        else if(inputForward < 0) {
+            pos -= dir * speed * delta;
+        }
+
+        if(inputUp > 0) {
+            pos += up * speed * delta;
+        }
+        else if(inputUp < 0) {
+            pos -= up * speed * delta;
+        }
+
+        if(inputRight > 0) {
+            pos += right * speed * delta;
+        }
+        else if(inputRight < 0) {
+            pos -= right * speed * delta;
+        }
+    }
+};
+
 struct Application {
 
 bool running = true;
@@ -101,10 +268,14 @@ i64 timeOffset;
 
 MeshHandle playerShipMesh;
 
-f32 dbgRotateX;
-f32 dbgRotateY;
-f32 dbgRotateZ;
+f32 dbgRotateX = 0;
+f32 dbgRotateY = 0;
+f32 dbgRotateZ = 0;
 f32 dbgScale = 1;
+
+Room roomTest;
+Camera cam;
+bool mouseCaptured = true;
 
 bool init()
 {
@@ -196,6 +367,10 @@ bool init()
         return false;
     }
 
+    roomTest.make(vec3{30, 20, 5});
+
+    SDL_SetRelativeMouseMode((SDL_bool)mouseCaptured);
+
     return true;
 }
 
@@ -216,13 +391,21 @@ void cleanUp()
 
 i32 run()
 {
+    i64 t0 = bx::getHPCounter();
+
     while(running) {
         SDL_Event event;
         while(SDL_PollEvent(&event)) {
             handleEvent(event);
         }
 
-        update();
+        const i64 t1 = bx::getHPCounter();
+        const i64 frameTime = t1 - t0;
+        t0 = t1;
+        const f64 freq = f64(bx::getHPFrequency());
+        f64 delta = f64(frameTime/freq);
+
+        update(delta);
     }
 
     cleanUp();
@@ -233,20 +416,29 @@ void handleEvent(const SDL_Event& event)
 {
     imguiHandleSDLEvent(event);
 
+    if(mouseCaptured) {
+        cam.handleEvent(event);
+    }
+
     if(event.type == SDL_QUIT) {
         running = false;
         return;
     }
 
-    if(event.type == SDL_KEYDOWN) {
+    if(event.type == SDL_KEYDOWN && event.key.repeat == 0) {
         if(event.key.keysym.sym == SDLK_ESCAPE) {
             running = false;
+            return;
+        }
+        if(event.key.keysym.sym == SDLK_w) {
+            SDL_SetRelativeMouseMode((SDL_bool)(mouseCaptured ^= 1));
+            SDL_WarpMouseInWindow(window, WINDOW_WIDTH/2, WINDOW_HEIGHT/2);
             return;
         }
     }
 }
 
-void update()
+void update(f64 delta)
 {
     i32 mx, my;
     u32 mstate = SDL_GetMouseState(&mx, &my);
@@ -261,24 +453,29 @@ void update()
     // TODO: add scroll
     imguiBeginFrame(mx, my, buttons, WINDOW_WIDTH, WINDOW_HEIGHT);
 
-    // ui code here
-    ImGui::ShowDemoWindow();
+    if(!mouseCaptured) {
+        // ui code here
+        ImGui::ShowDemoWindow();
 
-    ImGui::Begin("Test");
-    ImGui::SliderAngle("x", &dbgRotateX);
-    ImGui::SliderAngle("y", &dbgRotateY);
-    ImGui::SliderAngle("z", &dbgRotateZ);
-    ImGui::SliderFloat("scale", &dbgScale, 0.1, 100);
-    ImGui::End();
+        ImGui::Begin("Test");
+        ImGui::SliderAngle("x", &dbgRotateX);
+        ImGui::SliderAngle("y", &dbgRotateY);
+        ImGui::SliderAngle("z", &dbgRotateZ);
+        ImGui::SliderFloat("scale", &dbgScale, 0.1, 100);
+        ImGui::End();
+    }
 
     imguiEndFrame();
 
 
-    float at[3]  = { 0.0f, 0.0f,   0.0f };
-    float eye[3] = { 10.0f, -35.0f, 10.0f };
+    //float at[3]  = { 9.0f, 9.0f, 0.0f };
+    float eye[3] = { 10.0f, 10.0f, 20.0f };
     float up[3] =  { 0.0f, 0.0f, 1.0f };
     float view[16];
-    bx::mtxLookAtRh(view, eye, at, up);
+    vec3 at;
+    cam.applyInput(delta);
+    bx::vec3Add(at, cam.pos, cam.dir);
+    bx::mtxLookAtRh(view, cam.pos, at, up);
 
     float proj[16];
     bx::mtxProjRh(proj, 60.0f, f32(WINDOW_WIDTH)/f32(WINDOW_HEIGHT), 0.1f, 100.0f,
@@ -306,12 +503,12 @@ void update()
 
     float time = (float)( (bx::getHPCounter()-timeOffset)/double(bx::getHPFrequency() ) );
 
-    for(u32 yy = 0; yy < 11; ++yy) {
+    /*for(u32 yy = 0; yy < 11; ++yy) {
         for(u32 xx = 0; xx < 11; ++xx) {
             f32 mtx[16];
             bx::mtxIdentity(mtx);
             bx::mtxRotateXY(mtx, time + xx*0.21f, time + yy*0.37f);
-            //bx::mtxRotateZ(mtx, dbgRotate);
+            //bx::mtxRotateXYZ(mtx, dbgRotateX, dbgRotateY, dbgRotateZ);
             mtx[12] = -15.0f + f32(xx)*3.0f;
             mtx[13] = 0.0f;
             mtx[14] = -15.0f + f32(yy)*3.0f;
@@ -336,6 +533,41 @@ void update()
             bgfx::setUniform(u_color, color);
             bgfx::submit(0, programVertShadingColor);
         }
+    }*/
+
+    const i32 cubeCount = roomTest.cubeTransforms.size();
+    for(u32 i = 0; i < cubeCount; ++i) {
+        const Transform& tf = roomTest.cubeTransforms[i];
+        mat4 mtxModel;
+        mat4 mtxTrans, mtxRot, mtxScale;
+
+        f32 z = tf.pos.z + sin(time + i*0.21f) * 0.2;
+
+        bx::mtxTranslate(mtxTrans, tf.pos.x, tf.pos.y, z);
+        bx::mtxQuat(mtxRot, tf.rot);
+        bx::mtxScale(mtxScale, tf.scale.x, tf.scale.y, tf.scale.z);
+
+        bx::mtxMul(mtxModel, mtxTrans, mtxRot);
+        bx::mtxMul(mtxModel, mtxModel, mtxScale);
+
+        // Set model matrix for rendering.
+        bgfx::setTransform(mtxModel);
+
+        // Set vertex and index buffer.
+        bgfx::setVertexBuffer(0, cubeVbh, 0, BX_COUNTOF(s_cubeRainbowVertData));
+
+        // Set render states.
+        bgfx::setState(0
+            | BGFX_STATE_WRITE_MASK
+            | BGFX_STATE_DEPTH_TEST_LESS
+            | BGFX_STATE_CULL_CCW
+            | BGFX_STATE_MSAA
+            );
+
+        // Submit primitive for rendering to view 0.
+        const f32 color[] = {1, 0.5, 0, 1};
+        bgfx::setUniform(u_color, color);
+        bgfx::submit(0, programVertShadingColor);
     }
 
     const f32 color[] = {1, 0, 0, 1};
