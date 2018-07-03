@@ -121,107 +121,70 @@ struct Room
     }
 };
 
-struct Camera
+struct CameraFreeFlight
 {
     vec3 pos = {0, 0, 10};
     vec3 dir = {1, 0, 0};
     vec3 up = {0, 0, 1};
     quat rot;
     f32 speed = 30;
-    i8 inputForward = 0; // -1 == backward
-    i8 inputRight = 0; // -1 == left
-    i8 inputUp = 0; // -1 == down
+
+    struct {
+        bool8 forward;
+        bool8 backward;
+        bool8 left;
+        bool8 right;
+        bool8 up;
+        bool8 down;
+    } input = {};
+
+    f64 pitch = 0;
+    f64 yaw = 0;
 
     void handleEvent(const SDL_Event& event) {
-        if(event.type == SDL_KEYDOWN) {
-            if(event.key.keysym.sym == SDLK_z) {
-                if(inputForward == 0) {
-                    inputForward = 1;
-                }
-                return;
+        if(event.type == SDL_KEYDOWN && event.key.repeat == 0) {
+            switch(event.key.keysym.sym) {
+                case SDLK_z: input.forward = true; break;
+                case SDLK_s: input.backward = true; break;
+                case SDLK_q: input.left = true; break;
+                case SDLK_d: input.right = true; break;
+                case SDLK_a: input.up = true; break;
+                case SDLK_e: input.down = true; break;
             }
-            if(event.key.keysym.sym == SDLK_s) {
-                if(inputForward == 0) {
-                    inputForward = -1;
-                }
-                return;
-            }
-            if(event.key.keysym.sym == SDLK_a) {
-                if(inputUp == 0) {
-                    inputUp = 1;
-                }
-                return;
-            }
-            if(event.key.keysym.sym == SDLK_e) {
-                if(inputUp == 0) {
-                    inputUp = -1;
-                }
-                return;
-            }
-            if(event.key.keysym.sym == SDLK_q) {
-                if(inputRight == 0) {
-                    inputRight = -1;
-                }
-                return;
-            }
-            if(event.key.keysym.sym == SDLK_d) {
-                if(inputRight == 0) {
-                    inputRight = 1;
-                }
-                return;
-            }
+            return;
         }
         if(event.type == SDL_KEYUP) {
-            if(event.key.keysym.sym == SDLK_z) {
-                if(inputForward == 1) {
-                    inputForward = 0;
-                }
-                return;
+            switch(event.key.keysym.sym) {
+                case SDLK_z: input.forward = false; break;
+                case SDLK_s: input.backward = false; break;
+                case SDLK_q: input.left = false; break;
+                case SDLK_d: input.right = false; break;
+                case SDLK_a: input.up = false; break;
+                case SDLK_e: input.down = false; break;
             }
-            if(event.key.keysym.sym == SDLK_s) {
-                if(inputForward == -1) {
-                    inputForward = 0;
-                }
-                return;
-            }
-            if(event.key.keysym.sym == SDLK_a) {
-                if(inputUp == 1) {
-                    inputUp = 0;
-                }
-                return;
-            }
-            if(event.key.keysym.sym == SDLK_e) {
-                if(inputUp == -1) {
-                    inputUp = 0;
-                }
-                return;
-            }
-            if(event.key.keysym.sym == SDLK_q) {
-                if(inputRight == -1) {
-                    inputRight = 0;
-                }
-                return;
-            }
-            if(event.key.keysym.sym == SDLK_d) {
-                if(inputRight == 1) {
-                    inputRight = 0;
-                }
-                return;
-            }
+            return;
         }
 
         if(event.type == SDL_MOUSEMOTION) {
             // TODO: move this to applyInput
+            yaw = 0;
+            pitch = 0;
+            yaw += event.motion.xrel / (bx::kPi2 * 100.0);
+            pitch += event.motion.yrel / (bx::kPi2 * 100.0);
+
             vec3 right;
             bx::vec3Cross(right, dir, up);
             quat qyaw;
             quat qpitch;
-            bx::quatRotateAxis(qyaw, up, event.motion.xrel / (bx::kPi2 * 100.0));
-            bx::quatRotateAxis(qpitch, right, event.motion.yrel / (bx::kPi2 * 100.0));
+            bx::quatRotateAxis(qyaw, up, yaw);
+            bx::quatRotateAxis(qpitch, right, pitch);
             bx::quatMul(rot, qyaw, qpitch);
             bx::quatNorm(rot, rot);
+            //dir = {1, 0, 0};
             bx::vec3MulQuat(dir, dir, rot);
             bx::vec3Norm(dir, dir);
+
+            LOG("ptch = %g", pitch);
             return;
         }
     }
@@ -229,33 +192,18 @@ struct Camera
     void applyInput(f64 delta) {
         vec3 right;
         bx::vec3Cross(right, dir, up);
+        bx::vec3Norm(right, right);
 
-        if(inputForward > 0) {
-            pos += dir * speed * delta;
-        }
-        else if(inputForward < 0) {
-            pos -= dir * speed * delta;
-        }
-
-        if(inputUp > 0) {
-            pos += up * speed * delta;
-        }
-        else if(inputUp < 0) {
-            pos -= up * speed * delta;
-        }
-
-        if(inputRight > 0) {
-            pos += right * speed * delta;
-        }
-        else if(inputRight < 0) {
-            pos -= right * speed * delta;
-        }
+        pos += dir * speed * delta * (input.forward - input.backward);
+        pos += up * speed * delta * (input.up - input.down);
+        pos += right * speed * delta * (input.right - input.left);
     }
 };
 
 struct Application {
 
-bool running = true;
+bool8 mouseCaptured = true;
+bool8 running = true;
 SDL_Window* window;
 bgfx::ProgramHandle programTest;
 bgfx::ProgramHandle programVertShading;
@@ -264,6 +212,7 @@ bgfx::ProgramHandle programDbgColor;
 bgfx::UniformHandle u_color;
 bgfx::VertexBufferHandle cubeVbh;
 bgfx::VertexBufferHandle originVbh;
+bgfx::VertexBufferHandle gridVbh;
 i64 timeOffset;
 
 MeshHandle playerShipMesh;
@@ -274,8 +223,8 @@ f32 dbgRotateZ = 0;
 f32 dbgScale = 1;
 
 Room roomTest;
-Camera cam;
-bool mouseCaptured = true;
+CameraFreeFlight cam;
+PlayerShip playerShip;
 
 bool init()
 {
@@ -371,6 +320,22 @@ bool init()
 
     SDL_SetRelativeMouseMode((SDL_bool)mouseCaptured);
 
+    i32 i = 0;
+    for(i32 x = 0; x < 100; x++) {
+        s_gridLinesVertData[i++] = { x * 10.0f, 0, 0 };
+        s_gridLinesVertData[i++] = { x * 10.0f, 1000.0f, 0 };
+    }
+    for(i32 y = 0; y < 100; y++) {
+        s_gridLinesVertData[i++] = { 0, y * 10.0f, 0 };
+        s_gridLinesVertData[i++] = { 1000.0f, y * 10.0f, 0 };
+    }
+
+    gridVbh = bgfx::createVertexBuffer(
+            // Static data can be passed with bgfx::makeRef
+            bgfx::makeRef(s_gridLinesVertData, sizeof(s_gridLinesVertData)),
+            PosColorVertex::ms_decl
+            );
+
     return true;
 }
 
@@ -418,6 +383,7 @@ void handleEvent(const SDL_Event& event)
 
     if(mouseCaptured) {
         cam.handleEvent(event);
+        playerShip.handleEvent(event);
     }
 
     if(event.type == SDL_QUIT) {
@@ -438,7 +404,7 @@ void handleEvent(const SDL_Event& event)
     }
 }
 
-void update(f64 delta)
+void updateUI(f64 delta)
 {
     i32 mx, my;
     u32 mstate = SDL_GetMouseState(&mx, &my);
@@ -466,20 +432,24 @@ void update(f64 delta)
     }
 
     imguiEndFrame();
+}
 
+void update(f64 delta)
+{
+    updateUI(delta);
 
-    //float at[3]  = { 9.0f, 9.0f, 0.0f };
-    float eye[3] = { 10.0f, 10.0f, 20.0f };
-    float up[3] =  { 0.0f, 0.0f, 1.0f };
-    float view[16];
+    playerShip.update(delta);
+
+    vec3 up = { 0.0f, 0.0f, 1.0f };
+    mat4 view;
     vec3 at;
     cam.applyInput(delta);
     bx::vec3Add(at, cam.pos, cam.dir);
     bx::mtxLookAtRh(view, cam.pos, at, up);
 
-    float proj[16];
-    bx::mtxProjRh(proj, 60.0f, f32(WINDOW_WIDTH)/f32(WINDOW_HEIGHT), 0.1f, 100.0f,
-                bgfx::getCaps()->homogeneousDepth);
+    mat4 proj;
+    bx::mtxProjRh(proj, 60.0f, f32(WINDOW_WIDTH)/f32(WINDOW_HEIGHT), 0.1f, 1000.0f,
+                  bgfx::getCaps()->homogeneousDepth);
     bgfx::setViewTransform(0, view, proj);
 
     // Set view 0 default viewport.
@@ -499,6 +469,22 @@ void update(f64 delta)
     const f32 transparent[] = {0, 0, 0, 0};
     bgfx::setUniform(u_color, transparent);
     bgfx::setVertexBuffer(0, originVbh, 0, BX_COUNTOF(s_originVertData));
+    bgfx::submit(0, programDbgColor);
+
+    bgfx::setState(0
+        | BGFX_STATE_WRITE_MASK
+        | BGFX_STATE_DEPTH_TEST_LESS
+        | BGFX_STATE_MSAA
+        | BGFX_STATE_PT_LINES
+        );
+
+    mat4 mtxGrid;
+    bx::mtxTranslate(mtxGrid, -500, -500, 0);
+    bgfx::setTransform(mtxGrid);
+
+    const f32 white[] = {0.5, 0.5, 0.5, 1};
+    bgfx::setUniform(u_color, white);
+    bgfx::setVertexBuffer(0, gridVbh, 0, BX_COUNTOF(s_gridLinesVertData));
     bgfx::submit(0, programDbgColor);
 
     float time = (float)( (bx::getHPCounter()-timeOffset)/double(bx::getHPFrequency() ) );
@@ -535,20 +521,21 @@ void update(f64 delta)
         }
     }*/
 
+
     const i32 cubeCount = roomTest.cubeTransforms.size();
     for(u32 i = 0; i < cubeCount; ++i) {
         const Transform& tf = roomTest.cubeTransforms[i];
         mat4 mtxModel;
         mat4 mtxTrans, mtxRot, mtxScale;
 
-        f32 z = tf.pos.z + sin(time + i*0.21f) * 0.2;
+        f32 z = -4 + tf.pos.z + sin(time + i*0.21f) * 0.2;
 
         bx::mtxTranslate(mtxTrans, tf.pos.x, tf.pos.y, z);
         bx::mtxQuat(mtxRot, tf.rot);
         bx::mtxScale(mtxScale, tf.scale.x, tf.scale.y, tf.scale.z);
 
-        bx::mtxMul(mtxModel, mtxTrans, mtxRot);
-        bx::mtxMul(mtxModel, mtxModel, mtxScale);
+        bx::mtxMul(mtxModel, mtxScale, mtxRot);
+        bx::mtxMul(mtxModel, mtxModel, mtxTrans);
 
         // Set model matrix for rendering.
         bgfx::setTransform(mtxModel);
@@ -573,12 +560,8 @@ void update(f64 delta)
     const f32 color[] = {1, 0, 0, 1};
     bgfx::setUniform(u_color, color);
 
-    f32 mtx[16];
-    bx::mtxRotateXYZ(mtx, dbgRotateX, dbgRotateY, dbgRotateZ);
-    f32 mtxScale[16];
-    bx::mtxScale(mtxScale, dbgScale);
-    bx::mtxMul(mtx, mtx, mtxScale);
-    meshSubmit(playerShipMesh, 0, programVertShadingColor, mtx, BGFX_STATE_MASK);
+    playerShip.computeModelMatrix();
+    meshSubmit(playerShipMesh, 0, programVertShadingColor, playerShip.mtxModel, BGFX_STATE_MASK);
 
     // Advance to next frame. Rendering thread will be kicked to
     // process submitted rendering primitives.

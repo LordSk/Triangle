@@ -1,5 +1,6 @@
 #pragma once
-#include "mesh_load.h"
+#include "base.h"
+#include <SDL2/SDL_events.h>
 
 // TODO: move this
 union vec3
@@ -24,6 +25,13 @@ union vec3
     }
 };
 
+inline vec3 operator+(vec3 v1, vec3 v2) {
+    v1.x += v2.x;
+    v1.y += v2.y;
+    v1.z += v2.y;
+    return v1;
+}
+
 inline vec3 operator*(vec3 v, f32 scalar) {
     v.x *= scalar;
     v.y *= scalar;
@@ -47,15 +55,22 @@ struct mat4
 
 struct PlayerShip
 {
-    MeshHandle meshHnd;
     vec3 pos;
     vec3 scale;
     quat rotation;
     mat4 mtxModel;
 
-    void setMesh(MeshHandle hnd_) {
-        meshHnd = hnd_;
-    }
+    vec3 vel;
 
+    struct {
+        bool8 left;
+        bool8 right;
+        bool8 up;
+        bool8 down;
+    } input = {};
+
+    PlayerShip();
     void computeModelMatrix();
+    void handleEvent(const SDL_Event& event);
+    void update(f64 delta);
 };

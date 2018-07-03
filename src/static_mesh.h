@@ -94,3 +94,5 @@ static PosColorVertex s_cubeRainbowVertData[] =
     {-1.0f,  1.0f,  1.0f, 0xff000000, 0.0f, 1.0f, 0.0f },
     {-1.0f,  1.0f, -1.0f, 0xffff00ff, 0.0f, 1.0f, 0.0f },
 };
+
+static PosColorVertex s_gridLinesVertData[400];
