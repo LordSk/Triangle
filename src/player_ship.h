@@ -25,11 +25,12 @@ union vec3
     }
 };
 
-inline vec3 operator+(vec3 v1, vec3 v2) {
-    v1.x += v2.x;
-    v1.y += v2.y;
-    v1.z += v2.y;
-    return v1;
+inline vec3 operator+(const vec3& v1, const vec3& v2) {
+    vec3 v = v1;
+    v.x += v2.x;
+    v.y += v2.y;
+    v.z += v2.z;
+    return v;
 }
 
 inline vec3 operator*(vec3 v, f32 scalar) {

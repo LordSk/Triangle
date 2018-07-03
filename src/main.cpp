@@ -221,6 +221,8 @@ f32 dbgRotateX = 0;
 f32 dbgRotateY = 0;
 f32 dbgRotateZ = 0;
 f32 dbgScale = 1;
+i32 dbgCamComboId = 0;
+f32 dbgPlayerCamHeight = 15;
 
 Room roomTest;
 CameraFreeFlight cam;
@@ -401,6 +403,11 @@ void handleEvent(const SDL_Event& event)
             SDL_WarpMouseInWindow(window, WINDOW_WIDTH/2, WINDOW_HEIGHT/2);
             return;
         }
+        if(event.key.keysym.sym == SDLK_c) {
+            dbgCamComboId += 1;
+            dbgCamComboId = dbgCamComboId % 2;
+            return;
+        }
     }
 }
 
@@ -423,11 +430,11 @@ void updateUI(f64 delta)
         // ui code here
         ImGui::ShowDemoWindow();
 
-        ImGui::Begin("Test");
-        ImGui::SliderAngle("x", &dbgRotateX);
-        ImGui::SliderAngle("y", &dbgRotateY);
-        ImGui::SliderAngle("z", &dbgRotateZ);
-        ImGui::SliderFloat("scale", &dbgScale, 0.1, 100);
+        ImGui::Begin("Debug");
+
+        const char* comboCameras[] = { "Free flight", "Follow player" };
+        ImGui::Combo("Camera", &dbgCamComboId, comboCameras, arr_count(comboCameras));
+        ImGui::InputFloat("Player camera height", &dbgPlayerCamHeight, 1.0f, 10.0f);
         ImGui::End();
     }
 
@@ -440,12 +447,22 @@ void update(f64 delta)
 
     playerShip.update(delta);
 
-    vec3 up = { 0.0f, 0.0f, 1.0f };
+    const vec3 up = { 0.0f, 0.0f, 1.0f };
     mat4 view;
-    vec3 at;
-    cam.applyInput(delta);
-    bx::vec3Add(at, cam.pos, cam.dir);
-    bx::mtxLookAtRh(view, cam.pos, at, up);
+
+    if(dbgCamComboId == 0) {
+        vec3 at;
+        cam.applyInput(delta);
+        bx::vec3Add(at, cam.pos, cam.dir);
+        bx::mtxLookAtRh(view, cam.pos, at, up);
+    }
+    else if(dbgCamComboId == 1) {
+        vec3 dir = vec3{0, 0.0001f, -1.f};
+        bx::vec3Norm(dir, dir);
+        vec3 eye = playerShip.pos + vec3{0, 0, dbgPlayerCamHeight};
+        vec3 at = eye + dir;
+        bx::mtxLookAtRh(view, eye, at, up);
+    }
 
     mat4 proj;
     bx::mtxProjRh(proj, 60.0f, f32(WINDOW_WIDTH)/f32(WINDOW_HEIGHT), 0.1f, 1000.0f,
