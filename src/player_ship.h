@@ -122,11 +122,31 @@ inline bool planeLineIntersection(vec3* out, vec3 l0, vec3 ldir, vec3 p0, vec3 p
     return true;
 }
 
+struct Transform
+{
+    vec3 pos = {0, 0, 0};
+    vec3 scale = {1, 1, 1};
+    quat rot = {0, 0, 0, 1};
+
+    inline void toMtx(mat4* mtxModel) {
+        mat4 mtxTrans, mtxRot, mtxScale;
+
+        bx::mtxTranslate(mtxTrans, pos.x, pos.y, pos.z);
+        bx::mtxQuat(mtxRot, rot);
+        bx::mtxScale(mtxScale, scale.x, scale.y, scale.z);
+
+        // scale * rot * trans
+        mat4 mtx1;
+        bx::mtxMul(mtx1, mtxScale, mtxRot);
+        bx::mtxMul(*mtxModel, mtx1, mtxTrans);
+    }
+};
+
+
 struct PlayerShip
 {
-    vec3 pos;
-    vec3 scale;
-    quat rotation;
+    Transform tf;
+    quat baseRot;
     mat4 mtxModel;
 
     vec3 vel;

@@ -4,48 +4,41 @@
 
 PlayerShip::PlayerShip()
 {
-    pos = {0, 0, 0};
-    scale = {0.5, 0.5, 0.5};
-    rotation = {0, 0, 0, 1};
+    tf.scale = {0.5, 0.5, 0.5};
     vel = {};
     mousePosScreen = {};
-    mousePosWorld = {};
+    mousePosWorld = {10, 0, 0};
 
-    bx::quatRotateX(rotation, -bx::kPiHalf);
+    bx::quatRotateX(baseRot, -bx::kPiHalf);
     quat rotZ;
     bx::quatRotateZ(rotZ, -bx::kPiHalf);
-    bx::quatMul(rotation, rotation, rotZ);
+    bx::quatMul(baseRot, baseRot, rotZ);
+    tf.rot = baseRot;
 }
 
 void PlayerShip::computeModelMatrix()
 {
-    mat4 mtxTrans, mtxRot, mtxScale;
-    bx::mtxTranslate(mtxTrans, pos.x, pos.y, pos.z);
-    bx::mtxQuat(mtxRot, rotation);
-    bx::mtxScale(mtxScale, scale.x, scale.y, scale.z);
-
-    bx::mtxMul(mtxModel, mtxScale, mtxRot);
-    bx::mtxMul(mtxModel, mtxModel, mtxTrans);
+    tf.toMtx(&mtxModel);
 }
 
 void PlayerShip::handleEvent(const SDL_Event& event)
 {
     if(event.type == SDL_KEYDOWN && event.key.repeat == 0) {
         switch(event.key.keysym.sym) {
-            case SDLK_UP: input.up = true; break;
-            case SDLK_DOWN: input.down = true; break;
-            case SDLK_LEFT: input.left = true; break;
-            case SDLK_RIGHT: input.right = true; break;
+            case SDLK_z: input.up = true; break;
+            case SDLK_s: input.down = true; break;
+            case SDLK_q: input.left = true; break;
+            case SDLK_d: input.right = true; break;
         }
         return;
     }
 
     if(event.type == SDL_KEYUP) {
         switch(event.key.keysym.sym) {
-            case SDLK_UP: input.up = false; break;
-            case SDLK_DOWN: input.down = false; break;
-            case SDLK_LEFT: input.left = false; break;
-            case SDLK_RIGHT: input.right = false; break;
+            case SDLK_z: input.up = false; break;
+            case SDLK_s: input.down = false; break;
+            case SDLK_q: input.left = false; break;
+            case SDLK_d: input.right = false; break;
         }
         return;
     }
@@ -62,7 +55,7 @@ void PlayerShip::handleEvent(const SDL_Event& event)
 
 void PlayerShip::update(f64 delta)
 {
-    f64 speed = 5;
+    f64 speed = 20;
     vec3 dir = {0, 0, 0};
     dir.x = (input.right - input.left);
     dir.y = (input.up - input.down);
@@ -76,7 +69,11 @@ void PlayerShip::update(f64 delta)
         vel = vel * (1.0 - bx::clamp(5.0 * delta, 0.0, 1.0));
     }
 
-    pos += vel * delta;
+    tf.pos += vel * delta;
+
+    f32 angle = bx::atan2(-(mousePosWorld.y - tf.pos.y), mousePosWorld.x - tf.pos.x);
+    bx::quatRotateZ(tf.rot, angle);
+    bx::quatMul(tf.rot, baseRot, tf.rot);
 }
 
 void PlayerShip::computeCursorPos(const mat4& invViewProj, f32 camHeight)
@@ -101,7 +98,7 @@ void PlayerShip::computeCursorPos(const mat4& invViewProj, f32 camHeight)
     vec3 camDir;
     bx::vec3Norm(camDir, worldDir);
 
-    vec3 eye = pos + vec3{0, 0, camHeight};
+    vec3 eye = tf.pos + vec3{0, 0, camHeight};
     vec3 p0 = {0, 0, 0};
     vec3 pn = {0, 0, 1};
     planeLineIntersection(&mousePosWorld, eye, camDir, p0, pn);

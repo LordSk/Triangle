@@ -23,8 +23,9 @@
 #define WINDOW_WIDTH 1600
 #define WINDOW_HEIGHT 900
 
-// TODO: move this
+namespace im = ImGui;
 
+// TODO: move this
 bx::FileReader g_fileReader;
 bx::FileWriter g_fileWriter;
 bx::RngMwc g_rng;
@@ -90,45 +91,61 @@ bgfx::ProgramHandle loadProgram(bx::FileReaderI* _reader, const char* _vsName, c
 
 bgfx::VertexDecl PosColorVertex::ms_decl;
 
-struct Transform
-{
-    vec3 pos = {0, 0, 0};
-    vec3 scale = {1, 1, 1};
-    quat rot = {0, 0, 0, 1};
-
-    inline void toMtx(mat4* mtxModel) {
-        mat4 mtxTrans, mtxRot, mtxScale;
-
-        bx::mtxTranslate(mtxTrans, pos.x, pos.y, pos.z);
-        bx::mtxQuat(mtxRot, rot);
-        bx::mtxScale(mtxScale, scale.x, scale.y, scale.z);
-
-        bx::mtxMul(*mtxModel, mtxScale, mtxRot);
-        bx::mtxMul(*mtxModel, *mtxModel, mtxTrans);
-    }
-};
 
 struct Room
 {
+    Transform tfRoom;
     vec3 size;
     std::vector<Transform> cubeTransforms;
+    std::vector<mat4> cubeTfMtx;
 
-    void make(vec3 size_) {
-        size = vec3{bx::ceil(size_.x), bx::ceil(size_.y), bx::ceil(size_.z)};
-        i32 width = size.x/2;
-        i32 height = size.y/2;
+    void make(vec3 size_, const i32 cubeSize) {
+        size = vec3{bx::ceil(size_.x), bx::ceil(size_.y), size_.z};
+        i32 width = size.x / cubeSize;
+        i32 height = size.y / cubeSize;
 
-        for(i32 y = 0; y < width; y++) {
-            for(i32 x = 0; x < height; x++) {
-                Transform tf;
-                tf.pos.x = x * 2;
-                tf.pos.y = y * 2;
-                tf.pos.z = bx::frnd(&g_rng);
-                tf.scale = {1, 1, 1};
-                bx::quatIdentity(tf.rot);
-                cubeTransforms.push_back(tf);
+        // background
+        for(i32 y = 0; y < height; y++) {
+            for(i32 x = 0; x < width; x++) {
+                Transform tfCube;
+                tfCube.pos.x = cubeSize * 0.5 + x * cubeSize;
+                tfCube.pos.y = cubeSize * 0.5 + y * cubeSize;
+                tfCube.pos.z = -size.z + bx::frnd(&g_rng) * 0.5;
+                tfCube.scale = {(f32)cubeSize, (f32)cubeSize, 1.f};
+                bx::quatIdentity(tfCube.rot);
+                cubeTransforms.push_back(tfCube);
             }
         }
+
+        // walls
+        Transform tfWall;
+        tfWall.scale = {size.x, cubeSize * 0.5f, size.z};
+        tfWall.pos.x = size.x * 0.5f;
+        tfWall.pos.y = -tfWall.scale.y * 0.5f;
+        tfWall.pos.z = -size.z * 0.5;
+
+        cubeTransforms.push_back(tfWall);
+
+        tfWall = {};
+        tfWall.scale = {size.x, cubeSize * 0.5f, size.z};
+        tfWall.pos.x = size.x * 0.5f;
+        tfWall.pos.y = size.y + tfWall.scale.y * 0.5f;
+        tfWall.pos.z = -size.z * 0.5;
+        cubeTransforms.push_back(tfWall);
+
+        tfWall = {};
+        tfWall.scale = {cubeSize * 0.5f, size.y, size.z};
+        tfWall.pos.x = -tfWall.scale.x * 0.5f;
+        tfWall.pos.y = size.y * 0.5;
+        tfWall.pos.z = -size.z * 0.5;
+        cubeTransforms.push_back(tfWall);
+
+        tfWall = {};
+        tfWall.scale = {cubeSize * 0.5f, size.y, size.z};
+        tfWall.pos.x = size.x + tfWall.scale.x * 0.5f;
+        tfWall.pos.y = size.y * 0.5;
+        tfWall.pos.z = -size.z * 0.5;
+        cubeTransforms.push_back(tfWall);
     }
 };
 
@@ -209,9 +226,17 @@ struct CameraFreeFlight
     }
 };
 
+struct CameraID {
+    enum {
+        FREE_VIEW = 0,
+        PLAYER_VIEW,
+    } Enum;
+};
+
 struct Application {
 
 bool8 mouseCaptured = true;
+bool8 showUI = true;
 bool8 running = true;
 SDL_Window* window;
 bgfx::ProgramHandle programTest;
@@ -224,18 +249,20 @@ bgfx::VertexBufferHandle originVbh;
 bgfx::VertexBufferHandle gridVbh;
 i64 timeOffset;
 
+i32 cameraId = 0;
+CameraFreeFlight cam;
+
 MeshHandle playerShipMesh;
+Room roomTest;
+PlayerShip playerShip;
 
 f32 dbgRotateX = 0;
 f32 dbgRotateY = 0;
 f32 dbgRotateZ = 0;
 f32 dbgScale = 1;
-i32 dbgCamComboId = 0;
-f32 dbgPlayerCamHeight = 15;
-
-Room roomTest;
-CameraFreeFlight cam;
-PlayerShip playerShip;
+f32 dbgPlayerCamHeight = 30;
+bool dbgEnableGrid = true;
+bool dbgEnableWorldOrigin = true;
 
 bool init()
 {
@@ -286,7 +313,7 @@ bool init()
     init.deviceId = 0;
     init.resolution.width  = 1600;
     init.resolution.height = 900;
-    init.resolution.reset = BGFX_RESET_NONE;
+    init.resolution.reset = /*BGFX_RESET_NONE*/BGFX_RESET_MSAA_X16;
 
     if(!bgfx::init(init)) {
         LOG("ERROR> bgfx failed to initialize");
@@ -323,12 +350,6 @@ bool init()
 
     timeOffset = bx::getHPCounter();
 
-    if(!(playerShipMesh = meshLoad("assets/player_ship.mesh", &g_fileReader))) {
-        return false;
-    }
-
-    roomTest.make(vec3{30, 20, 5});
-
     SDL_SetRelativeMouseMode((SDL_bool)mouseCaptured);
 
     i32 i = 0;
@@ -347,7 +368,22 @@ bool init()
             PosColorVertex::ms_decl
             );
 
+    if(!(playerShipMesh = meshLoad("assets/player_ship.mesh", &g_fileReader))) {
+        return false;
+    }
+
+    initGame();
+
     return true;
+}
+
+void initGame()
+{
+    roomTest.make(vec3{100, 50, 10}, 5);
+    roomTest.tfRoom.pos.z = 6;
+    playerShip.tf.pos = {10, 10, 0};
+
+    cameraId = CameraID::PLAYER_VIEW;
 }
 
 void cleanUp()
@@ -391,8 +427,12 @@ i32 run()
 void handleEvent(const SDL_Event& event)
 {
     if(mouseCaptured) {
-        cam.handleEvent(event);
-        playerShip.handleEvent(event);
+        if(cameraId == CameraID::FREE_VIEW) {
+            cam.handleEvent(event);
+        }
+        else if(cameraId == CameraID::PLAYER_VIEW) {
+            playerShip.handleEvent(event);
+        }
     }
     else {
         imguiHandleSDLEvent(event);
@@ -413,9 +453,18 @@ void handleEvent(const SDL_Event& event)
             SDL_WarpMouseInWindow(window, WINDOW_WIDTH/2, WINDOW_HEIGHT/2);
             return;
         }
+        if(event.key.keysym.sym == SDLK_x) {
+            showUI ^= 1;
+            return;
+        }
         if(event.key.keysym.sym == SDLK_c) {
-            dbgCamComboId += 1;
-            dbgCamComboId = dbgCamComboId % 2;
+            cameraId += 1;
+            cameraId = cameraId % 2;
+            return;
+        }
+        if(event.key.keysym.sym == SDLK_v) {
+            dbgEnableGrid ^= 1;
+            dbgEnableWorldOrigin ^= 1;
             return;
         }
     }
@@ -436,17 +485,34 @@ void updateUI(f64 delta)
         }
     }
 
+    if(!showUI) {
+        return;
+    }
+
     imguiBeginFrame(mx, my, buttons, WINDOW_WIDTH, WINDOW_HEIGHT);
 
     // ui code here
-    ImGui::ShowDemoWindow();
+    im::ShowDemoWindow();
 
-    ImGui::Begin("Debug");
+    im::Begin("Debug");
 
     const char* comboCameras[] = { "Free flight", "Follow player" };
-    ImGui::Combo("Camera", &dbgCamComboId, comboCameras, arr_count(comboCameras));
-    ImGui::InputFloat("Player camera height", &dbgPlayerCamHeight, 1.0f, 10.0f);
-    ImGui::End();
+    im::Combo("Camera", &cameraId, comboCameras, arr_count(comboCameras));
+    im::InputFloat("Player camera height", &dbgPlayerCamHeight, 1.0f, 10.0f);
+    im::Checkbox("Enable grid", &dbgEnableGrid);
+    im::Checkbox("Enable world origin", &dbgEnableWorldOrigin);
+
+    im::End();
+
+    im::Begin("Stats");
+    const bgfx::Stats* stats = bgfx::getStats();
+    const f64 toMsCpu = 1000.0/stats->cpuTimerFreq;
+    const f64 toMsGpu = 1000.0/stats->gpuTimerFreq;
+    const f64 frameMs = f64(stats->cpuTimeFrame) * toMsCpu;
+    const f64 gpuFrameMs = f64(stats->gpuTimeEnd - stats->gpuTimeBegin) * toMsGpu;
+    im::Text("CPU ft: %0.5f ms", frameMs);
+    im::Text("GPU ft: %0.5f ms", gpuFrameMs);
+    im::End();
 }
 
 void update(f64 delta)
@@ -458,16 +524,17 @@ void update(f64 delta)
     const vec3 up = { 0.0f, 0.0f, 1.0f };
     mat4 view;
 
-    if(dbgCamComboId == 0) {
+    if(cameraId == CameraID::FREE_VIEW) {
         vec3 at;
         cam.applyInput(delta);
+
         bx::vec3Add(at, cam.pos, cam.dir);
         bx::mtxLookAtRh(view, cam.pos, at, up);
     }
-    else if(dbgCamComboId == 1) {
+    else if(cameraId == CameraID::PLAYER_VIEW) {
         vec3 dir = vec3{0, 0.001f, -1.f};
         bx::vec3Norm(dir, dir);
-        vec3 eye = playerShip.pos + vec3{0, 0, dbgPlayerCamHeight};
+        vec3 eye = playerShip.tf.pos + vec3{0, 0, dbgPlayerCamHeight};
         vec3 at = eye + dir;
         bx::mtxLookAtRh(view, eye, at, up);
     }
@@ -477,12 +544,6 @@ void update(f64 delta)
                   bgfx::getCaps()->homogeneousDepth);
     bgfx::setViewTransform(0, view, proj);
 
-    mat4 invView;
-    mat4 viewProj;
-    bx::mtxMul(viewProj, view, proj);
-    bx::mtxInverse(invView, viewProj);
-    playerShip.computeCursorPos(invView, dbgPlayerCamHeight);
-
     // Set view 0 default viewport.
     bgfx::setViewRect(0, 0, 0, u16(WINDOW_WIDTH), u16(WINDOW_HEIGHT));
 
@@ -490,91 +551,61 @@ void update(f64 delta)
     // if no other draw calls are submitted to view 0.
     bgfx::touch(0);
 
-    bgfx::setState(0
-        | BGFX_STATE_WRITE_MASK
-        | BGFX_STATE_DEPTH_TEST_LESS
-        | BGFX_STATE_MSAA
-        | BGFX_STATE_PT_LINES
-        );
+    // origin gizmo
+    if(dbgEnableWorldOrigin) {
+        bgfx::setState(0
+            | BGFX_STATE_WRITE_MASK
+            | BGFX_STATE_DEPTH_TEST_LESS
+            | BGFX_STATE_MSAA
+            | BGFX_STATE_PT_LINES
+            );
 
-    const f32 transparent[] = {0, 0, 0, 0};
-    bgfx::setUniform(u_color, transparent);
-    bgfx::setVertexBuffer(0, originVbh, 0, BX_COUNTOF(s_originVertData));
-    bgfx::submit(0, programDbgColor);
+        const f32 transparent[] = {0, 0, 0, 0};
+        bgfx::setUniform(u_color, transparent);
+        bgfx::setVertexBuffer(0, originVbh, 0, BX_COUNTOF(s_originVertData));
+        bgfx::submit(0, programDbgColor);
+    }
 
-    bgfx::setState(0
-        | BGFX_STATE_WRITE_MASK
-        | BGFX_STATE_DEPTH_TEST_LESS
-        | BGFX_STATE_MSAA
-        | BGFX_STATE_PT_LINES
-        );
+    // XY grid
+    if(dbgEnableGrid) {
+        bgfx::setState(0
+            | BGFX_STATE_WRITE_MASK
+            | BGFX_STATE_DEPTH_TEST_LESS
+            | BGFX_STATE_MSAA
+            | BGFX_STATE_PT_LINES
+            );
 
-    mat4 mtxGrid;
-    bx::mtxTranslate(mtxGrid, -500, -500, 0);
-    bgfx::setTransform(mtxGrid);
+        mat4 mtxGrid;
+        bx::mtxTranslate(mtxGrid, -500, -500, 0);
+        bgfx::setTransform(mtxGrid);
 
-    const f32 white[] = {0.5, 0.5, 0.5, 1};
-    bgfx::setUniform(u_color, white);
-    bgfx::setVertexBuffer(0, gridVbh, 0, BX_COUNTOF(s_gridLinesVertData));
-    bgfx::submit(0, programDbgColor);
+        const f32 white[] = {0.5, 0.5, 0.5, 1};
+        bgfx::setUniform(u_color, white);
+        bgfx::setVertexBuffer(0, gridVbh, 0, BX_COUNTOF(s_gridLinesVertData));
+        bgfx::submit(0, programDbgColor);
+    }
 
     float time = (float)( (bx::getHPCounter()-timeOffset)/double(bx::getHPFrequency() ) );
 
-    /*for(u32 yy = 0; yy < 11; ++yy) {
-        for(u32 xx = 0; xx < 11; ++xx) {
-            f32 mtx[16];
-            bx::mtxIdentity(mtx);
-            bx::mtxRotateXY(mtx, time + xx*0.21f, time + yy*0.37f);
-            //bx::mtxRotateXYZ(mtx, dbgRotateX, dbgRotateY, dbgRotateZ);
-            mtx[12] = -15.0f + f32(xx)*3.0f;
-            mtx[13] = 0.0f;
-            mtx[14] = -15.0f + f32(yy)*3.0f;
-
-            // Set model matrix for rendering.
-            bgfx::setTransform(mtx);
-
-            // Set vertex and index buffer.
-            bgfx::setVertexBuffer(0, cubeVbh, 0, BX_COUNTOF(s_cubeRainbowVertData));
-
-            // Set render states.
-            bgfx::setState(0
-                | BGFX_STATE_WRITE_MASK
-                | BGFX_STATE_DEPTH_TEST_LESS
-                | BGFX_STATE_CULL_CCW
-                | BGFX_STATE_MSAA
-                //| BGFX_STATE_PT_TRIANGLES (is triangles by default)
-                );
-
-            // Submit primitive for rendering to view 0.
-            const f32 color[] = {1, 1, 1, 1};
-            bgfx::setUniform(u_color, color);
-            bgfx::submit(0, programVertShadingColor);
-        }
-    }*/
-
+    // debug room
+    mat4 mtxRoom;
+    roomTest.tfRoom.toMtx(&mtxRoom);
 
     const i32 cubeCount = roomTest.cubeTransforms.size();
     for(u32 i = 0; i < cubeCount; ++i) {
-        const Transform& tf = roomTest.cubeTransforms[i];
+        Transform tf = roomTest.cubeTransforms[i];
+        mat4 mtx1;
         mat4 mtxModel;
-        mat4 mtxTrans, mtxRot, mtxScale;
 
-        f32 z = -4 + tf.pos.z + sin(time + i*0.21f) * 0.2;
+        tf.pos.z = tf.pos.z - sin(time + i*0.21f) * 0.2;
 
-        bx::mtxTranslate(mtxTrans, tf.pos.x, tf.pos.y, z);
-        bx::mtxQuat(mtxRot, tf.rot);
-        bx::mtxScale(mtxScale, tf.scale.x, tf.scale.y, tf.scale.z);
+        // model * roomModel
+        tf.toMtx(&mtx1);
+        bx::mtxMul(mtxModel, mtx1, mtxRoom);
 
-        bx::mtxMul(mtxModel, mtxScale, mtxRot);
-        bx::mtxMul(mtxModel, mtxModel, mtxTrans);
-
-        // Set model matrix for rendering.
         bgfx::setTransform(mtxModel);
-
-        // Set vertex and index buffer.
         bgfx::setVertexBuffer(0, cubeVbh, 0, BX_COUNTOF(s_cubeRainbowVertData));
 
-        // Set render states.
         bgfx::setState(0
             | BGFX_STATE_WRITE_MASK
             | BGFX_STATE_DEPTH_TEST_LESS
@@ -582,19 +613,26 @@ void update(f64 delta)
             | BGFX_STATE_MSAA
             );
 
-        // Submit primitive for rendering to view 0.
-        const f32 color[] = {1, 0.5, 0, 1};
+        const f32 color[] = {0.6f, 0.4f, 0.3f, 1};
         bgfx::setUniform(u_color, color);
         bgfx::submit(0, programVertShadingColor);
     }
 
+    // player ship
     const f32 color[] = {1, 0, 0, 1};
     bgfx::setUniform(u_color, color);
 
     playerShip.computeModelMatrix();
     meshSubmit(playerShipMesh, 0, programVertShadingColor, playerShip.mtxModel, BGFX_STATE_MASK);
 
-    if(dbgCamComboId == 1) {
+    // mouse cursor
+    if(cameraId == CameraID::PLAYER_VIEW) {
+        mat4 invView;
+        mat4 viewProj;
+        bx::mtxMul(viewProj, view, proj);
+        bx::mtxInverse(invView, viewProj);
+        playerShip.computeCursorPos(invView, dbgPlayerCamHeight);
+
         bgfx::setState(0
             | BGFX_STATE_WRITE_MASK
             | BGFX_STATE_DEPTH_TEST_LESS
@@ -608,7 +646,7 @@ void update(f64 delta)
 
         Transform tfCursor;
         tfCursor.pos = playerShip.mousePosWorld;
-        tfCursor.scale = { 0.2f, 0.2f, 0.2f };
+        tfCursor.scale = { 0.4f, 0.4f, 0.4f };
         tfCursor.toMtx(&mtxCursor);
 
         bgfx::setTransform(mtxCursor);
@@ -616,7 +654,9 @@ void update(f64 delta)
         bgfx::submit(0, programDbgColor);
     }
 
-    imguiEndFrame();
+    if(showUI) {
+        imguiEndFrame();
+    }
 
     // Advance to next frame. Rendering thread will be kicked to
     // process submitted rendering primitives.
