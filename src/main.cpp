@@ -51,8 +51,7 @@ static bgfx::ShaderHandle loadShader(bx::FileReaderI* _reader, const char* _name
 
     const char* ext = "???";
 
-    switch (bgfx::getRendererType() )
-    {
+    switch(bgfx::getRendererType()) {
         case bgfx::RendererType::Noop:
         case bgfx::RendererType::Direct3D9:  ext = ".dx9";   break;
         case bgfx::RendererType::Direct3D11:
@@ -93,8 +92,20 @@ bgfx::VertexDecl PosColorVertex::ms_decl;
 
 struct Transform
 {
-    vec3 pos, scale;
-    quat rot;
+    vec3 pos = {0, 0, 0};
+    vec3 scale = {1, 1, 1};
+    quat rot = {0, 0, 0, 1};
+
+    inline void toMtx(mat4* mtxModel) {
+        mat4 mtxTrans, mtxRot, mtxScale;
+
+        bx::mtxTranslate(mtxTrans, pos.x, pos.y, pos.z);
+        bx::mtxQuat(mtxRot, rot);
+        bx::mtxScale(mtxScale, scale.x, scale.y, scale.z);
+
+        bx::mtxMul(*mtxModel, mtxScale, mtxRot);
+        bx::mtxMul(*mtxModel, *mtxModel, mtxTrans);
+    }
 };
 
 struct Room
@@ -183,8 +194,6 @@ struct CameraFreeFlight
             //dir = {1, 0, 0};
             bx::vec3MulQuat(dir, dir, rot);
             bx::vec3Norm(dir, dir);
-
-            LOG("ptch = %g", pitch);
             return;
         }
     }
@@ -381,11 +390,12 @@ i32 run()
 
 void handleEvent(const SDL_Event& event)
 {
-    imguiHandleSDLEvent(event);
-
     if(mouseCaptured) {
         cam.handleEvent(event);
         playerShip.handleEvent(event);
+    }
+    else {
+        imguiHandleSDLEvent(event);
     }
 
     if(event.type == SDL_QUIT) {
@@ -413,32 +423,30 @@ void handleEvent(const SDL_Event& event)
 
 void updateUI(f64 delta)
 {
-    i32 mx, my;
-    u32 mstate = SDL_GetMouseState(&mx, &my);
+    i32 mx = 0, my = 0;
     u8 buttons = 0;
-    if(mstate & SDL_BUTTON(SDL_BUTTON_LEFT)) {
-        buttons |= IMGUI_MBUT_LEFT;
-    }
-    if(mstate & SDL_BUTTON(SDL_BUTTON_RIGHT)) {
-        buttons |= IMGUI_MBUT_RIGHT;
-    }
-
-    // TODO: add scroll
-    imguiBeginFrame(mx, my, buttons, WINDOW_WIDTH, WINDOW_HEIGHT);
 
     if(!mouseCaptured) {
-        // ui code here
-        ImGui::ShowDemoWindow();
-
-        ImGui::Begin("Debug");
-
-        const char* comboCameras[] = { "Free flight", "Follow player" };
-        ImGui::Combo("Camera", &dbgCamComboId, comboCameras, arr_count(comboCameras));
-        ImGui::InputFloat("Player camera height", &dbgPlayerCamHeight, 1.0f, 10.0f);
-        ImGui::End();
+        u32 mstate = SDL_GetMouseState(&mx, &my);
+        if(mstate & SDL_BUTTON(SDL_BUTTON_LEFT)) {
+            buttons |= IMGUI_MBUT_LEFT;
+        }
+        if(mstate & SDL_BUTTON(SDL_BUTTON_RIGHT)) {
+            buttons |= IMGUI_MBUT_RIGHT;
+        }
     }
 
-    imguiEndFrame();
+    imguiBeginFrame(mx, my, buttons, WINDOW_WIDTH, WINDOW_HEIGHT);
+
+    // ui code here
+    ImGui::ShowDemoWindow();
+
+    ImGui::Begin("Debug");
+
+    const char* comboCameras[] = { "Free flight", "Follow player" };
+    ImGui::Combo("Camera", &dbgCamComboId, comboCameras, arr_count(comboCameras));
+    ImGui::InputFloat("Player camera height", &dbgPlayerCamHeight, 1.0f, 10.0f);
+    ImGui::End();
 }
 
 void update(f64 delta)
@@ -457,7 +465,7 @@ void update(f64 delta)
         bx::mtxLookAtRh(view, cam.pos, at, up);
     }
     else if(dbgCamComboId == 1) {
-        vec3 dir = vec3{0, 0.0001f, -1.f};
+        vec3 dir = vec3{0, 0.001f, -1.f};
         bx::vec3Norm(dir, dir);
         vec3 eye = playerShip.pos + vec3{0, 0, dbgPlayerCamHeight};
         vec3 at = eye + dir;
@@ -468,6 +476,12 @@ void update(f64 delta)
     bx::mtxProjRh(proj, 60.0f, f32(WINDOW_WIDTH)/f32(WINDOW_HEIGHT), 0.1f, 1000.0f,
                   bgfx::getCaps()->homogeneousDepth);
     bgfx::setViewTransform(0, view, proj);
+
+    mat4 invView;
+    mat4 viewProj;
+    bx::mtxMul(viewProj, view, proj);
+    bx::mtxInverse(invView, viewProj);
+    playerShip.computeCursorPos(invView, dbgPlayerCamHeight);
 
     // Set view 0 default viewport.
     bgfx::setViewRect(0, 0, 0, u16(WINDOW_WIDTH), u16(WINDOW_HEIGHT));
@@ -579,6 +593,30 @@ void update(f64 delta)
 
     playerShip.computeModelMatrix();
     meshSubmit(playerShipMesh, 0, programVertShadingColor, playerShip.mtxModel, BGFX_STATE_MASK);
+
+    if(dbgCamComboId == 1) {
+        bgfx::setState(0
+            | BGFX_STATE_WRITE_MASK
+            | BGFX_STATE_DEPTH_TEST_LESS
+            | BGFX_STATE_CULL_CCW
+            | BGFX_STATE_MSAA
+            );
+
+        const f32 pink[] = {1, 0, 1, 1};
+        bgfx::setUniform(u_color, pink);
+        mat4 mtxCursor;
+
+        Transform tfCursor;
+        tfCursor.pos = playerShip.mousePosWorld;
+        tfCursor.scale = { 0.2f, 0.2f, 0.2f };
+        tfCursor.toMtx(&mtxCursor);
+
+        bgfx::setTransform(mtxCursor);
+        bgfx::setVertexBuffer(0, cubeVbh, 0, BX_COUNTOF(s_cubeRainbowVertData));
+        bgfx::submit(0, programDbgColor);
+    }
+
+    imguiEndFrame();
 
     // Advance to next frame. Rendering thread will be kicked to
     // process submitted rendering primitives.

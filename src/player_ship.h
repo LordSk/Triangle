@@ -1,8 +1,33 @@
 #pragma once
 #include "base.h"
+#include <bx/math.h>
 #include <SDL2/SDL_events.h>
 
 // TODO: move this
+union vec4
+{
+    struct { f32 x, y, z, w; };
+    f32 data[4];
+    operator f32*() { return data; }
+    operator const f32*() const { return data; }
+
+    inline vec4& operator +=(const vec4& v2) {
+        x += v2.x;
+        y += v2.y;
+        z += v2.z;
+        w += v2.w;
+        return *this;
+    }
+
+    inline vec4& operator -=(const vec4& v2) {
+        x -= v2.x;
+        y -= v2.y;
+        z -= v2.z;
+        w -= v2.w;
+        return *this;
+    }
+};
+
 union vec3
 {
     struct { f32 x, y, z; };
@@ -25,11 +50,39 @@ union vec3
     }
 };
 
+union vec2
+{
+    struct { f32 x, y; };
+    f32 data[2];
+    operator f32*() { return data; }
+    operator const f32*() const { return data; }
+
+    inline vec2& operator +=(const vec2& v2) {
+        x += v2.x;
+        y += v2.y;
+        return *this;
+    }
+
+    inline vec2& operator -=(const vec2& v2) {
+        x -= v2.x;
+        y -= v2.y;
+        return *this;
+    }
+};
+
 inline vec3 operator+(const vec3& v1, const vec3& v2) {
     vec3 v = v1;
     v.x += v2.x;
     v.y += v2.y;
     v.z += v2.z;
+    return v;
+}
+
+inline vec3 operator-(const vec3& v1, const vec3& v2) {
+    vec3 v = v1;
+    v.x -= v2.x;
+    v.y -= v2.y;
+    v.z -= v2.z;
     return v;
 }
 
@@ -52,7 +105,22 @@ struct mat4
 {
     f32 data[16];
     operator f32*() { return data; }
+    operator const f32*() const { return data; }
 };
+
+// ldir and pn must be normalized
+inline bool planeLineIntersection(vec3* out, vec3 l0, vec3 ldir, vec3 p0, vec3 pn)
+{
+    f32 d = bx::vec3Dot(ldir, pn);
+    if(d == 0) {
+        return false;
+    }
+
+    vec3 d0 = p0 - l0;
+    f32 si = bx::vec3Dot(pn, d0) / d;
+    *out = l0 + ldir * si;
+    return true;
+}
 
 struct PlayerShip
 {
@@ -62,6 +130,8 @@ struct PlayerShip
     mat4 mtxModel;
 
     vec3 vel;
+    vec3 mousePosScreen;
+    vec3 mousePosWorld;
 
     struct {
         bool8 left;
@@ -74,4 +144,5 @@ struct PlayerShip
     void computeModelMatrix();
     void handleEvent(const SDL_Event& event);
     void update(f64 delta);
+    void computeCursorPos(const mat4& invViewProj, f32 camHeight);
 };
