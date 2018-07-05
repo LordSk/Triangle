@@ -100,9 +100,16 @@ struct Room
     std::vector<mat4> cubeTfMtx;
 
     void make(vec3 size_, const i32 cubeSize) {
-        size = vec3{bx::ceil(size_.x), bx::ceil(size_.y), size_.z};
-        i32 width = size.x / cubeSize;
+        i32 sizexi = bx::ceil(size_.x);
+        i32 sizeyi = bx::ceil(size_.y);
+        size.x = sizexi + (cubeSize - (sizexi % cubeSize));
+        size.y = sizeyi + (cubeSize - (sizeyi % cubeSize));
+        size.z = size_.z;
+        i32 width =  size.x / cubeSize;
         i32 height = size.y / cubeSize;
+
+        cubeTransforms.clear();
+        cubeTransforms.reserve(width * height + 4);
 
         // background
         for(i32 y = 0; y < height; y++) {
@@ -123,7 +130,6 @@ struct Room
         tfWall.pos.x = size.x * 0.5f;
         tfWall.pos.y = -tfWall.scale.y * 0.5f;
         tfWall.pos.z = -size.z * 0.5;
-
         cubeTransforms.push_back(tfWall);
 
         tfWall = {};
@@ -242,6 +248,7 @@ SDL_Window* window;
 bgfx::ProgramHandle programTest;
 bgfx::ProgramHandle programVertShading;
 bgfx::ProgramHandle programVertShadingColor;
+bgfx::ProgramHandle programVertShadingColorInstance;
 bgfx::ProgramHandle programDbgColor;
 bgfx::UniformHandle u_color;
 bgfx::VertexBufferHandle cubeVbh;
@@ -346,6 +353,8 @@ bool init()
     programTest = loadProgram(&g_fileReader, "vs_test", "fs_test");
     programVertShading = loadProgram(&g_fileReader, "vs_vertex_shading", "fs_vertex_shading");
     programVertShadingColor = loadProgram(&g_fileReader, "vs_vertex_shading", "fs_vertex_shading_color");
+    programVertShadingColorInstance = loadProgram(&g_fileReader, "vs_vertex_shading_instance",
+                                                  "fs_vertex_shading_instance");
     programDbgColor = loadProgram(&g_fileReader, "vs_dbg_color", "fs_dbg_color");
 
     timeOffset = bx::getHPCounter();
@@ -379,8 +388,8 @@ bool init()
 
 void initGame()
 {
-    roomTest.make(vec3{100, 50, 10}, 5);
-    roomTest.tfRoom.pos.z = 6;
+    roomTest.make(vec3{100, 50, 10}, 2);
+    roomTest.tfRoom.pos.z = 3;
     playerShip.tf.pos = {10, 10, 0};
 
     cameraId = CameraID::PLAYER_VIEW;
@@ -592,19 +601,38 @@ void update(f64 delta)
     roomTest.tfRoom.toMtx(&mtxRoom);
 
     const i32 cubeCount = roomTest.cubeTransforms.size();
-    for(u32 i = 0; i < cubeCount; ++i) {
-        Transform tf = roomTest.cubeTransforms[i];
-        mat4 mtx1;
-        mat4 mtxModel;
+    // 80 bytes stride = 64 bytes for 4x4 matrix + 16 bytes for RGBA color.
+    const uint16_t instanceStride = 80;
+    const uint32_t numInstances   = cubeCount;
 
-        tf.pos.z = tf.pos.z - sin(time + i*0.21f) * 0.2;
+    if(numInstances == bgfx::getAvailInstanceDataBuffer(numInstances, instanceStride)) {
+        bgfx::InstanceDataBuffer idb;
+        bgfx::allocInstanceDataBuffer(&idb, numInstances, instanceStride);
 
-        // model * roomModel
-        tf.toMtx(&mtx1);
-        bx::mtxMul(mtxModel, mtx1, mtxRoom);
+        u8* data = idb.data;
 
-        bgfx::setTransform(mtxModel);
+        for(u32 i = 0; i < cubeCount; ++i) {
+            Transform tf = roomTest.cubeTransforms[i];
+            mat4 mtx1;
+            f32* mtxModel = (f32*)data;
+
+            tf.pos.z = tf.pos.z - sin(time + i*0.21f) * 0.2;
+
+            // model * roomModel
+            tf.toMtx(&mtx1);
+            bx::mtxMul(mtxModel, mtx1, mtxRoom);
+
+            f32* color = (f32*)&data[64];
+            color[0] = 0.6f;
+            color[1] = 0.4f;
+            color[2] = 0.3f;
+            color[3] = 1.0f;
+
+            data += instanceStride;
+        }
+
         bgfx::setVertexBuffer(0, cubeVbh, 0, BX_COUNTOF(s_cubeRainbowVertData));
+        bgfx::setInstanceDataBuffer(&idb);
 
         bgfx::setState(0
             | BGFX_STATE_WRITE_MASK
@@ -613,9 +641,7 @@ void update(f64 delta)
             | BGFX_STATE_MSAA
             );
 
-        const f32 color[] = {0.6f, 0.4f, 0.3f, 1};
-        bgfx::setUniform(u_color, color);
-        bgfx::submit(0, programVertShadingColor);
+        bgfx::submit(0, programVertShadingColorInstance);
     }
 
     // player ship
