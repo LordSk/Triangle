@@ -8,6 +8,7 @@ PlayerShip::PlayerShip()
     vel = {};
     mousePosScreen = {};
     mousePosWorld = {10, 0, 0};
+    angle = 0;
 
     bx::quatRotateX(baseRot, -bx::kPiHalf);
     quat rotZ;
@@ -71,7 +72,7 @@ void PlayerShip::update(f64 delta)
 
     tf.pos += vel * delta;
 
-    f32 angle = bx::atan2(-(mousePosWorld.y - tf.pos.y), mousePosWorld.x - tf.pos.x);
+    angle = bx::atan2(-(mousePosWorld.y - tf.pos.y), mousePosWorld.x - tf.pos.x);
     bx::quatRotateZ(tf.rot, angle);
     bx::quatMul(tf.rot, baseRot, tf.rot);
 }

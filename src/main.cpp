@@ -17,8 +17,9 @@
 #include "static_mesh.h"
 #include "mesh_load.h"
 #include "player_ship.h"
-
-#include <vector>
+#include "utils.h"
+#include "dbg_draw.h"
+#include "collision.h"
 
 #define WINDOW_WIDTH 1600
 #define WINDOW_HEIGHT 900
@@ -26,71 +27,11 @@
 namespace im = ImGui;
 
 // TODO: move this
-bx::FileReader g_fileReader;
-bx::FileWriter g_fileWriter;
-bx::RngMwc g_rng;
-
-static const bgfx::Memory* loadMem(bx::FileReaderI* _reader, const char* _filePath)
-{
-    if(bx::open(_reader, _filePath)) {
-        uint32_t size = (uint32_t)bx::getSize(_reader);
-        const bgfx::Memory* mem = bgfx::alloc(size+1);
-        bx::read(_reader, mem->data, size);
-        bx::close(_reader);
-        mem->data[mem->size-1] = '\0';
-        return mem;
-    }
-
-    LOG("Failed to load %s.", _filePath);
-    assert(0);
-    return NULL;
-}
-
-static bgfx::ShaderHandle loadShader(bx::FileReaderI* _reader, const char* _name)
-{
-    char filePath[512];
-
-    const char* ext = "???";
-
-    switch(bgfx::getRendererType()) {
-        case bgfx::RendererType::Noop:
-        case bgfx::RendererType::Direct3D9:  ext = ".dx9";   break;
-        case bgfx::RendererType::Direct3D11:
-        case bgfx::RendererType::Direct3D12: ext = ".dx11";  break;
-        case bgfx::RendererType::Gnm:        ext = ".pssl";  break;
-        case bgfx::RendererType::Metal:      ext = ".metal"; break;
-        case bgfx::RendererType::OpenGL:     ext = ".glsl";  break;
-        case bgfx::RendererType::OpenGLES:   ext = ".essl";  break;
-        case bgfx::RendererType::Vulkan:     ext = ".spirv"; break;
-
-        case bgfx::RendererType::Count:
-            assert(0);
-            break;
-    }
-
-    bx::strCopy(filePath, BX_COUNTOF(filePath), _name);
-    bx::strCat(filePath, BX_COUNTOF(filePath), ext);
-
-    bgfx::ShaderHandle handle = bgfx::createShader(loadMem(_reader, filePath) );
-    bgfx::setName(handle, filePath);
-
-    return handle;
-}
-
-bgfx::ProgramHandle loadProgram(bx::FileReaderI* _reader, const char* _vsName, const char* _fsName)
-{
-    bgfx::ShaderHandle vsh = loadShader(_reader, _vsName);
-    bgfx::ShaderHandle fsh = BGFX_INVALID_HANDLE;
-    if (NULL != _fsName)
-    {
-        fsh = loadShader(_reader, _fsName);
-    }
-
-    return bgfx::createProgram(vsh, fsh, true /* destroy shaders when program is destroyed */);
-}
+static bx::FileReader g_fileReader;
+static bx::FileWriter g_fileWriter;
+static bx::RngMwc g_rng;
 
 bgfx::VertexDecl PosColorVertex::ms_decl;
-
 
 struct Room
 {
@@ -258,6 +199,8 @@ i64 timeOffset;
 
 i32 cameraId = 0;
 CameraFreeFlight cam;
+mat4 proj;
+mat4 camView;
 
 MeshHandle playerShipMesh;
 Room roomTest;
@@ -357,6 +300,10 @@ bool init()
                                                   "fs_vertex_shading_instance");
     programDbgColor = loadProgram(&g_fileReader, "vs_dbg_color", "fs_dbg_color");
 
+    if(!dbgDrawInit()) {
+        return false;
+    }
+
     timeOffset = bx::getHPCounter();
 
     SDL_SetRelativeMouseMode((SDL_bool)mouseCaptured);
@@ -388,7 +335,7 @@ bool init()
 
 void initGame()
 {
-    roomTest.make(vec3{100, 50, 10}, 2);
+    roomTest.make(vec3{100, 50, 10}, 4);
     roomTest.tfRoom.pos.z = 3;
     playerShip.tf.pos = {10, 10, 0};
 
@@ -399,11 +346,16 @@ void cleanUp()
 {
     imguiDestroy();
 
+    dbgDrawDeinit();
+
     meshUnload(playerShipMesh);
+    bgfx::destroy(originVbh);
+    bgfx::destroy(gridVbh);
     bgfx::destroy(cubeVbh);
     bgfx::destroy(programTest);
     bgfx::destroy(programVertShading);
     bgfx::destroy(programVertShadingColor);
+    bgfx::destroy(programVertShadingColorInstance);
     bgfx::destroy(programDbgColor);
     bgfx::destroy(u_color);
 
@@ -427,6 +379,7 @@ i32 run()
         f64 delta = f64(frameTime/freq);
 
         update(delta);
+        render();
     }
 
     cleanUp();
@@ -528,30 +481,76 @@ void update(f64 delta)
 {
     updateUI(delta);
 
+    dbgDrawLine({0, 0, 0}, {10, 0, 0}, vec4{0, 0, 1, 1}, 0.1f);
+    dbgDrawLine({0, 0, 0}, {0, 10, 0}, vec4{0, 1, 0, 1}, 0.1f);
+    dbgDrawLine({0, 0, 0}, {0, 0, 10}, vec4{1, 0, 0, 1}, 0.1f);
+
     playerShip.update(delta);
+    playerShip.computeModelMatrix();
 
     const vec3 up = { 0.0f, 0.0f, 1.0f };
-    mat4 view;
+    bx::mtxProjRh(proj, 60.0f, f32(WINDOW_WIDTH)/f32(WINDOW_HEIGHT), 0.1f, 1000.0f,
+                  bgfx::getCaps()->homogeneousDepth);
 
     if(cameraId == CameraID::FREE_VIEW) {
         vec3 at;
         cam.applyInput(delta);
 
         bx::vec3Add(at, cam.pos, cam.dir);
-        bx::mtxLookAtRh(view, cam.pos, at, up);
+        bx::mtxLookAtRh(camView, cam.pos, at, up);
     }
     else if(cameraId == CameraID::PLAYER_VIEW) {
         vec3 dir = vec3{0, 0.001f, -1.f};
         bx::vec3Norm(dir, dir);
         vec3 eye = playerShip.tf.pos + vec3{0, 0, dbgPlayerCamHeight};
         vec3 at = eye + dir;
-        bx::mtxLookAtRh(view, eye, at, up);
+        bx::mtxLookAtRh(camView, eye, at, up);
+
+        mat4 invView;
+        mat4 viewProj;
+        bx::mtxMul(viewProj, camView, proj);
+        bx::mtxInverse(invView, viewProj);
+        playerShip.computeCursorPos(invView, dbgPlayerCamHeight);
     }
 
-    mat4 proj;
-    bx::mtxProjRh(proj, 60.0f, f32(WINDOW_WIDTH)/f32(WINDOW_HEIGHT), 0.1f, 1000.0f,
-                  bgfx::getCaps()->homogeneousDepth);
-    bgfx::setViewTransform(0, view, proj);
+
+    f32 time = (f32)((bx::getHPCounter()-timeOffset)/f64(bx::getHPFrequency()));
+
+    OrientedBoundingBox obbA;
+    obbA.origin = {20, 20, 0};
+    obbA.size = {14, 5, 2};
+    obbA.angle = (sin(time) + 1.0) * bx::kPiHalf;
+
+    OrientedBoundingBox obbB;
+    obbB.origin = playerShip.tf.pos;
+    obbB.size = {5, 5, 2};
+    obbB.angle = playerShip.angle;
+
+    vec4 colorA = { 0, 1, 1, 0.5f };
+    vec4 colorB = { 1, 0, 1, 0.5f };
+    if(obbIntersect(obbA, obbB, nullptr)) {
+        colorA = { 1, 0, 0, 0.5f};
+        colorB = { 1, 0, 0, 0.5f};
+    }
+
+    obbDbgDraw(obbA, colorA);
+    obbDbgDraw(obbB, colorB);
+
+    dbgDrawLine({10, 10, 0}, {10, 10, 10}, vec4{1, 1, 0, 1});
+
+    Transform tfTestRect;
+    tfTestRect.pos = {-10, -10, 0 };
+    tfTestRect.scale = { 10, 10, 10 };
+    dbgDrawRect(tfTestRect, vec4{1, 1, 0, 0.5});
+
+    if(showUI) {
+        imguiEndFrame();
+    }
+}
+
+void render()
+{
+    bgfx::setViewTransform(0, camView, proj);
 
     // Set view 0 default viewport.
     bgfx::setViewRect(0, 0, 0, u16(WINDOW_WIDTH), u16(WINDOW_HEIGHT));
@@ -594,9 +593,10 @@ void update(f64 delta)
         bgfx::submit(0, programDbgColor);
     }
 
-    float time = (float)( (bx::getHPCounter()-timeOffset)/double(bx::getHPFrequency() ) );
+    f32 time = (f32)((bx::getHPCounter()-timeOffset)/f64(bx::getHPFrequency()));
 
     // debug room
+#if 0
     mat4 mtxRoom;
     roomTest.tfRoom.toMtx(&mtxRoom);
 
@@ -643,22 +643,16 @@ void update(f64 delta)
 
         bgfx::submit(0, programVertShadingColorInstance);
     }
+#endif
 
     // player ship
     const f32 color[] = {1, 0, 0, 1};
     bgfx::setUniform(u_color, color);
 
-    playerShip.computeModelMatrix();
     meshSubmit(playerShipMesh, 0, programVertShadingColor, playerShip.mtxModel, BGFX_STATE_MASK);
 
     // mouse cursor
     if(cameraId == CameraID::PLAYER_VIEW) {
-        mat4 invView;
-        mat4 viewProj;
-        bx::mtxMul(viewProj, view, proj);
-        bx::mtxInverse(invView, viewProj);
-        playerShip.computeCursorPos(invView, dbgPlayerCamHeight);
-
         bgfx::setState(0
             | BGFX_STATE_WRITE_MASK
             | BGFX_STATE_DEPTH_TEST_LESS
@@ -680,9 +674,7 @@ void update(f64 delta)
         bgfx::submit(0, programDbgColor);
     }
 
-    if(showUI) {
-        imguiEndFrame();
-    }
+    dbgDrawRender();
 
     // Advance to next frame. Rendering thread will be kicked to
     // process submitted rendering primitives.
