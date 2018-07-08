@@ -68,8 +68,11 @@ struct DbgDraw
     };
 
     Array<InstanceData> instDataObb;
+    Array<InstanceData> instDataSphere;
     bgfx::ProgramHandle progDbgColorInstance;
     bgfx::VertexBufferHandle cubeVbh;
+    bgfx::VertexBufferHandle sphereVbh;
+    i32 sphereVertCount;
 
     bool init() {
         progDbgColorInstance = loadProgram(&g_fileReader, "vs_dbg_color_instance",
@@ -84,12 +87,22 @@ struct DbgDraw
                     );
 
         instDataObb.reserve(2048);
+        instDataSphere.reserve(2048);
+
+        static PosColorVertex sphereVertData[8192];
+        makeSphere(sphereVertData, arr_count(sphereVertData), &sphereVertCount);
+
+        sphereVbh = bgfx::createVertexBuffer(
+                    bgfx::makeRef(sphereVertData, sizeof(sphereVertData)),
+                    PosColorVertex::ms_decl
+                    );
 
         return true;
     }
 
     void deinit() {
         bgfx::destroy(cubeVbh);
+        bgfx::destroy(sphereVbh);
         bgfx::destroy(progDbgColorInstance);
     }
 
@@ -114,17 +127,30 @@ struct DbgDraw
         instDataObb.push({ mtx, color });
     }
 
+    void sphere(const vec3& pos, f32 radius, vec4 color) {
+        Transform tf;
+        tf.pos = pos;
+        tf.scale = { radius, radius, radius };
+
+        mat4 mtx;
+        tf.toMtx(&mtx);
+        instDataSphere.push({ mtx, color });
+    }
+
     void render() {
-        const i32 cubeCount = instDataObb.size();
-        if(!cubeCount) {
+        const i32 cubeCount = instDataObb.count();
+        const i32 sphereCount = instDataSphere.count();
+        if(!cubeCount && !sphereCount) {
             return;
         }
 
         // 80 bytes stride = 64 bytes for 4x4 matrix + 16 bytes for RGBA color.
-        const uint16_t instanceStride = 80;
-        const uint32_t numInstances   = cubeCount;
+        const u16 instanceStride = 80;
 
-        if(numInstances == bgfx::getAvailInstanceDataBuffer(numInstances, instanceStride)) {
+        u32 numInstances = cubeCount;
+
+        if(numInstances > 0 &&
+           numInstances == bgfx::getAvailInstanceDataBuffer(numInstances, instanceStride)) {
             bgfx::InstanceDataBuffer idb;
             bgfx::allocInstanceDataBuffer(&idb, numInstances, instanceStride);
 
@@ -145,6 +171,31 @@ struct DbgDraw
         }
 
         instDataObb.clear();
+
+        numInstances = sphereCount;
+
+        if(numInstances > 0 &&
+           numInstances == bgfx::getAvailInstanceDataBuffer(numInstances, instanceStride)) {
+            bgfx::InstanceDataBuffer idb;
+            bgfx::allocInstanceDataBuffer(&idb, numInstances, instanceStride);
+
+            memmove(idb.data, instDataSphere.data(), sizeof(InstanceData) * sphereCount);
+
+            bgfx::setVertexBuffer(0, sphereVbh, 0, sphereVertCount);
+            bgfx::setInstanceDataBuffer(&idb);
+
+            bgfx::setState(0
+                | BGFX_STATE_WRITE_MASK
+                | BGFX_STATE_DEPTH_TEST_LESS
+                | BGFX_STATE_CULL_CCW
+                | BGFX_STATE_MSAA
+                | BGFX_STATE_BLEND_ALPHA
+                );
+
+            bgfx::submit(0, progDbgColorInstance);
+        }
+
+        instDataSphere.clear();
     }
 };
 
@@ -173,4 +224,9 @@ void dbgDrawLine(const vec3& p1, const vec3& p2, vec4 color, f32 thickness)
 void dbgDrawRender()
 {
     g_dbgDraw.render();
+}
+
+void dbgDrawSphere(const vec3& pos, f32 radius, vec4 color)
+{
+    g_dbgDraw.sphere(pos, radius, color);
 }

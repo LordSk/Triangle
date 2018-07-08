@@ -15,6 +15,9 @@ struct CircleBound
     f32 radius;
 };
 
-bool obbIntersect(const OrientedBoundingBox& obbA, const OrientedBoundingBox& obbB, void* out);
+bool obbIntersectObb(const OrientedBoundingBox& obbA, const OrientedBoundingBox& obbB, void* out);
+bool obbIntersectCb(const OrientedBoundingBox& obbA, const CircleBound& cbB, void* out);
+
 void obbDbgDraw(const OrientedBoundingBox& obb, vec4 color);
+void cbDbgDraw(const CircleBound& cb, vec4 color);
 

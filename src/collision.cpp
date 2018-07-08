@@ -1,9 +1,8 @@
 #include "collision.h"
 #include "dbg_draw.h"
 
-
 // sepearatig axis theorem
-bool obbIntersect(const OrientedBoundingBox& obbA, const OrientedBoundingBox& obbB, void* out)
+bool obbIntersectObb(const OrientedBoundingBox& obbA, const OrientedBoundingBox& obbB, void* out)
 {
     // TODO: do 3D (maybe)
 
@@ -23,16 +22,14 @@ bool obbIntersect(const OrientedBoundingBox& obbA, const OrientedBoundingBox& ob
     bx::vec3MulQuat(pmaxB, obbB.size, qB);
 
     // A
-    vec2 centerA = vec2{ obbA.origin.x, obbA.origin.y } + vec2{ pmaxA.x, pmaxA.y }
-                   * 0.5f;
+    vec2 centerA = vec2{ obbA.origin.x, obbA.origin.y } + vec2{ pmaxA.x, pmaxA.y } * 0.5f;
     vec2 xA = vec2{ cosA, -sinA };
     vec2 yA = vec2{ sinA, cosA };
     f32 halfWidthA = obbA.size.x * 0.5f;
     f32 halfHeightA = obbA.size.y * 0.5f;
 
     // B
-    vec2 centerB = vec2{ obbB.origin.x, obbB.origin.y } + vec2{ pmaxB.x, pmaxB.y }
-                   * 0.5f;
+    vec2 centerB = vec2{ obbB.origin.x, obbB.origin.y } + vec2{ pmaxB.x, pmaxB.y } * 0.5f;
     vec2 xB = vec2{ cosB, -sinB };
     vec2 yB = vec2{ sinB, cosB };
     f32 halfWidthB = obbB.size.x * 0.5f;
@@ -71,6 +68,11 @@ bool obbIntersect(const OrientedBoundingBox& obbA, const OrientedBoundingBox& ob
     return true;
 }
 
+bool obbIntersectCb(const OrientedBoundingBox& obbA, const CircleBound& cbB, void* out)
+{
+    return true;
+}
+
 void obbDbgDraw(const OrientedBoundingBox& obb, vec4 color)
 {
     const f32 cosA = bx::cos(obb.angle);
@@ -101,4 +103,11 @@ void obbDbgDraw(const OrientedBoundingBox& obb, vec4 color)
     tfObb.scale = obb.size;
     bx::quatRotateZ(tfObb.rot, obb.angle);
     dbgDrawRect(tfObb, color);
+}
+
+void cbDbgDraw(const CircleBound& cb, vec4 color)
+{
+    dbgDrawLine(cb.center, cb.center + vec3{cb.radius, 0, 0}, vec4{0, 0, 1, 1});
+    dbgDrawLine(cb.center, cb.center + vec3{0, cb.radius, 0}, vec4{0, 1, 0, 1});
+    dbgDrawSphere(cb.center, cb.radius, color);
 }

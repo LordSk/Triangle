@@ -14,7 +14,9 @@
 #include <bx/rng.h>
 #include <imgui/bgfx_imgui.h>
 
+#define STATIC_MESH_DATA
 #include "static_mesh.h"
+
 #include "mesh_load.h"
 #include "player_ship.h"
 #include "utils.h"
@@ -526,22 +528,28 @@ void update(f64 delta)
     obbB.size = {5, 5, 2};
     obbB.angle = playerShip.angle;
 
+    CircleBound cbB;
+    cbB.center = playerShip.tf.pos;
+    cbB.radius = 5.0;
+
     vec4 colorA = { 0, 1, 1, 0.5f };
     vec4 colorB = { 1, 0, 1, 0.5f };
-    if(obbIntersect(obbA, obbB, nullptr)) {
+    /*if(obbIntersectObb(obbA, obbB, nullptr)) {
         colorA = { 1, 0, 0, 0.5f};
         colorB = { 1, 0, 0, 0.5f};
     }
 
     obbDbgDraw(obbA, colorA);
-    obbDbgDraw(obbB, colorB);
+    obbDbgDraw(obbB, colorB);*/
+
+    obbDbgDraw(obbA, colorA);
+    cbDbgDraw(cbB, colorB);
+
 
     dbgDrawLine({10, 10, 0}, {10, 10, 10}, vec4{1, 1, 0, 1});
 
-    Transform tfTestRect;
-    tfTestRect.pos = {-10, -10, 0 };
-    tfTestRect.scale = { 10, 10, 10 };
-    dbgDrawRect(tfTestRect, vec4{1, 1, 0, 0.5});
+
+    dbgDrawSphere({0, 0, 0}, 10.0, {0.5, 0.5, 1, 1});
 
     if(showUI) {
         imguiEndFrame();
