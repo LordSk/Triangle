@@ -41,6 +41,7 @@ struct Room
     vec3 size;
     std::vector<Transform> cubeTransforms;
     std::vector<mat4> cubeTfMtx;
+    PhysWorld physWorld;
 
     void make(vec3 size_, const i32 cubeSize) {
         i32 sizexi = bx::ceil(size_.x);
@@ -95,6 +96,29 @@ struct Room
         tfWall.pos.y = size.y * 0.5;
         tfWall.pos.z = -size.z * 0.5;
         cubeTransforms.push_back(tfWall);
+
+        Collider colWall;
+        OrientedBoundingBox obbWall;
+        obbWall.origin = vec3{ 0, -cubeSize * 0.5f, -size.z };
+        obbWall.size = vec3{ size.x, cubeSize * 0.5f, size.z };
+        obbWall.angle = 0;
+        physWorld.addStaticCollider(colWall.makeObb(obbWall));
+
+        obbWall.origin = vec3{ 0, size.y, -size.z };
+        obbWall.size = vec3{ size.x, cubeSize * 0.5f, size.z };
+        physWorld.addStaticCollider(colWall.makeObb(obbWall));
+
+        obbWall.origin = vec3{ -cubeSize * 0.5f, 0, -size.z };
+        obbWall.size = vec3{ cubeSize * 0.5f, size.y, size.z };
+        physWorld.addStaticCollider(colWall.makeObb(obbWall));
+
+        obbWall.origin = vec3{ size.x, 0, -size.z };
+        obbWall.size = vec3{ cubeSize * 0.5f, size.y, size.z };
+        physWorld.addStaticCollider(colWall.makeObb(obbWall));
+    }
+
+    void dbgDraw() {
+        physWorld.dbgDraw(tfRoom.pos);
     }
 };
 
@@ -198,6 +222,7 @@ bgfx::VertexBufferHandle cubeVbh;
 bgfx::VertexBufferHandle originVbh;
 bgfx::VertexBufferHandle gridVbh;
 i64 timeOffset;
+f64 physWorldTimeAcc = 0;
 
 i32 cameraId = 0;
 CameraFreeFlight cam;
@@ -205,8 +230,9 @@ mat4 proj;
 mat4 camView;
 
 MeshHandle playerShipMesh;
-Room roomTest;
+Room room;
 PlayerShip playerShip;
+PhysBody* playerBody;
 
 f32 dbgRotateX = 0;
 f32 dbgRotateY = 0;
@@ -215,6 +241,7 @@ f32 dbgScale = 1;
 f32 dbgPlayerCamHeight = 30;
 bool dbgEnableGrid = true;
 bool dbgEnableWorldOrigin = true;
+bool dbgEnableDbgDraw = true;
 
 bool init()
 {
@@ -337,11 +364,19 @@ bool init()
 
 void initGame()
 {
-    roomTest.make(vec3{100, 50, 10}, 4);
-    roomTest.tfRoom.pos.z = 3;
+    room.make(vec3{100, 50, 10}, 4);
+    room.tfRoom.pos.z = 3;
     playerShip.tf.pos = {10, 10, 0};
 
     cameraId = CameraID::PLAYER_VIEW;
+
+    PhysBody body = {};
+    body.col.makeCb(CircleBound{ vec3{0, 0, 0}, 2.0f });
+    body.pos = vec3{ 10, 10, 0 };
+    body.weight = 1.0;
+    body.bounceStrength = 0.0;
+    playerBody = room.physWorld.addDynamicBody(body);
+    playerShip.body = playerBody;
 }
 
 void cleanUp()
@@ -465,6 +500,7 @@ void updateUI(f64 delta)
     im::InputFloat("Player camera height", &dbgPlayerCamHeight, 1.0f, 10.0f);
     im::Checkbox("Enable grid", &dbgEnableGrid);
     im::Checkbox("Enable world origin", &dbgEnableWorldOrigin);
+    im::Checkbox("Enable debug draw", &dbgEnableDbgDraw);
 
     im::End();
 
@@ -483,11 +519,17 @@ void update(f64 delta)
 {
     updateUI(delta);
 
+    physWorldTimeAcc += delta;
+    if(physWorldTimeAcc >= PHYS_UPDATE_DELTA) {
+        room.physWorld.update(PHYS_UPDATE_DELTA, 10);
+        physWorldTimeAcc = 0;
+    }
+
     dbgDrawLine({0, 0, 0}, {10, 0, 0}, vec4{0, 0, 1, 1}, 0.1f);
     dbgDrawLine({0, 0, 0}, {0, 10, 0}, vec4{0, 1, 0, 1}, 0.1f);
     dbgDrawLine({0, 0, 0}, {0, 0, 10}, vec4{1, 0, 0, 1}, 0.1f);
 
-    playerShip.update(delta);
+    playerShip.update(delta, physWorldTimeAcc / PHYS_UPDATE_DELTA);
     playerShip.computeModelMatrix();
 
     const vec3 up = { 0.0f, 0.0f, 1.0f };
@@ -518,38 +560,7 @@ void update(f64 delta)
 
     f32 time = (f32)((bx::getHPCounter()-timeOffset)/f64(bx::getHPFrequency()));
 
-    OrientedBoundingBox obbA;
-    obbA.origin = {20, 20, 0};
-    obbA.size = {14, 5, 2};
-    obbA.angle = (sin(time) + 1.0) * bx::kPiHalf;
-
-    OrientedBoundingBox obbB;
-    obbB.origin = playerShip.tf.pos;
-    obbB.size = {5, 5, 2};
-    obbB.angle = playerShip.angle;
-
-    CircleBound cbB;
-    cbB.center = playerShip.tf.pos;
-    cbB.radius = 5.0;
-
-    vec4 colorA = { 0, 1, 1, 0.5f };
-    vec4 colorB = { 1, 0, 1, 0.5f };
-    /*if(obbIntersectObb(obbA, obbB, nullptr)) {
-        colorA = { 1, 0, 0, 0.5f};
-        colorB = { 1, 0, 0, 0.5f};
-    }
-
-    obbDbgDraw(obbA, colorA);
-    obbDbgDraw(obbB, colorB);*/
-
-    obbDbgDraw(obbA, colorA);
-    cbDbgDraw(cbB, colorB);
-
-
-    dbgDrawLine({10, 10, 0}, {10, 10, 10}, vec4{1, 1, 0, 1});
-
-
-    dbgDrawSphere({0, 0, 0}, 10.0, {0.5, 0.5, 1, 1});
+    room.dbgDraw();
 
     if(showUI) {
         imguiEndFrame();
@@ -682,7 +693,9 @@ void render()
         bgfx::submit(0, programDbgColor);
     }
 
-    dbgDrawRender();
+    if(dbgEnableDbgDraw) {
+        dbgDrawRender();
+    }
 
     // Advance to next frame. Rendering thread will be kicked to
     // process submitted rendering primitives.

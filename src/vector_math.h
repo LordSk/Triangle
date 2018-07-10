@@ -47,6 +47,14 @@ union vec3
         z -= v2.z;
         return *this;
     }
+
+    inline vec3 operator-() {
+        vec3 v;
+        v.x = -x;
+        v.y = -y;
+        v.z = -z;
+        return v;
+    }
 };
 
 inline vec3 operator+(const vec3& v1, const vec3& v2) {
@@ -115,6 +123,16 @@ inline vec2 operator*(vec2 v, f32 scalar) {
 inline f32 vec2Dot(vec2 v1, vec2 v2)
 {
     return v1.x * v2 .x + v1.y * v2.y;
+}
+
+inline f32 vec2Len(vec2 v)
+{
+    return bx::sqrt(v.x * v.x + v.y * v.y);
+}
+
+inline vec2 vec2Norm(vec2 v1)
+{
+    return v1 * (1.0f / vec2Len(v1));
 }
 
 union quat

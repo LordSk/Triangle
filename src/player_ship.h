@@ -9,7 +9,8 @@ struct PlayerShip
     quat baseRot;
     mat4 mtxModel;
 
-    vec3 vel;
+    struct PhysBody* body = nullptr;
+
     vec3 mousePosScreen;
     vec3 mousePosWorld;
     f32 angle;
@@ -24,6 +25,6 @@ struct PlayerShip
     PlayerShip();
     void computeModelMatrix();
     void handleEvent(const SDL_Event& event);
-    void update(f64 delta);
+    void update(f64 delta, f64 physWorldAlpha);
     void computeCursorPos(const mat4& invViewProj, f32 camHeight);
 };

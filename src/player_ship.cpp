@@ -1,11 +1,10 @@
 #include "player_ship.h"
+#include "collision.h"
 #include <bx/math.h>
-
 
 PlayerShip::PlayerShip()
 {
     tf.scale = {0.5, 0.5, 0.5};
-    vel = {};
     mousePosScreen = {};
     mousePosWorld = {10, 0, 0};
     angle = 0;
@@ -54,8 +53,9 @@ void PlayerShip::handleEvent(const SDL_Event& event)
     }
 }
 
-void PlayerShip::update(f64 delta)
+void PlayerShip::update(f64 delta, f64 physWorldAlpha)
 {
+    assert(body);
     f64 speed = 20;
     vec3 dir = {0, 0, 0};
     dir.x = (input.right - input.left);
@@ -63,14 +63,14 @@ void PlayerShip::update(f64 delta)
 
     if(bx::vec3Length(dir) > 0) {
         bx::vec3Norm(dir, dir);
-        vel = dir * speed;
+        body->vel = dir * speed;
     }
     else {
         // apply friction
-        vel = vel * (1.0 - bx::clamp(5.0 * delta, 0.0, 1.0));
+        body->vel = body->vel * (1.0 - bx::clamp(20.0 * delta, 0.0, 1.0));
     }
 
-    tf.pos += vel * delta;
+    bx::vec3Lerp(tf.pos, body->pos, body->pos + body->vel * PHYS_UPDATE_DELTA, physWorldAlpha);
 
     angle = bx::atan2(-(mousePosWorld.y - tf.pos.y), mousePosWorld.x - tf.pos.x);
     bx::quatRotateZ(tf.rot, angle);
