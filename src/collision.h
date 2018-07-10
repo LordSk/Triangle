@@ -59,6 +59,11 @@ struct Collider
     }
 };
 
+struct CollisionInfo
+{
+    vec2 penVec;
+};
+
 struct PhysBody
 {
     Collider col;
@@ -82,10 +87,10 @@ struct PhysWorld
     void dbgDraw(vec3 offset);
 };
 
-bool obbIntersectObb(const OrientedBoundingBox& obbA, const OrientedBoundingBox& obbB, void* out);
-bool obbIntersectCb(const OrientedBoundingBox& obbA, const CircleBound& cbB, void* out);
-bool cbIntersectCb(const CircleBound& cbA, const CircleBound& cbB, void* out);
-bool colliderIntersect(const Collider& col1, const Collider& col2, void* out);
+bool obbIntersectObb(const OrientedBoundingBox& obbA, const OrientedBoundingBox& obbB, CollisionInfo* out);
+bool obbIntersectCb(const OrientedBoundingBox& obbA, const CircleBound& cbB, CollisionInfo* out);
+bool cbIntersectCb(const CircleBound& cbA, const CircleBound& cbB, CollisionInfo* out);
+bool colliderIntersect(const Collider& col1, const Collider& col2, CollisionInfo* out);
 
 void obbDbgDraw(const OrientedBoundingBox& obb, vec4 color);
 void cbDbgDraw(const CircleBound& cb, vec4 color);

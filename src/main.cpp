@@ -377,6 +377,13 @@ void initGame()
     body.bounceStrength = 0.0;
     playerBody = room.physWorld.addDynamicBody(body);
     playerShip.body = playerBody;
+
+    Collider col;
+    OrientedBoundingBox obb;
+    obb.origin = vec3{10, 10, -10};
+    obb.size = vec3{10, 20, 5};
+    obb.angle = 0;
+    room.physWorld.addStaticCollider(col.makeObb(obb));
 }
 
 void cleanUp()
@@ -519,11 +526,13 @@ void update(f64 delta)
 {
     updateUI(delta);
 
-    physWorldTimeAcc += delta;
+    /*physWorldTimeAcc += delta;
     if(physWorldTimeAcc >= PHYS_UPDATE_DELTA) {
-        room.physWorld.update(PHYS_UPDATE_DELTA, 10);
+        room.physWorld.update(PHYS_UPDATE_DELTA, 1);
         physWorldTimeAcc = 0;
-    }
+    }*/
+
+    room.physWorld.update(delta, 1);
 
     dbgDrawLine({0, 0, 0}, {10, 0, 0}, vec4{0, 0, 1, 1}, 0.1f);
     dbgDrawLine({0, 0, 0}, {0, 10, 0}, vec4{0, 1, 0, 1}, 0.1f);

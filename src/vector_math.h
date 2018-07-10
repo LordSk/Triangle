@@ -122,7 +122,7 @@ inline vec2 operator*(vec2 v, f32 scalar) {
 
 inline f32 vec2Dot(vec2 v1, vec2 v2)
 {
-    return v1.x * v2 .x + v1.y * v2.y;
+    return v1.x * v2.x + v1.y * v2.y;
 }
 
 inline f32 vec2Len(vec2 v)
@@ -135,6 +135,11 @@ inline vec2 vec2Norm(vec2 v1)
     return v1 * (1.0f / vec2Len(v1));
 }
 
+inline vec3 vec2ToVec3(vec2 v1)
+{
+    return vec3{ v1.x, v1.y, 0 };
+}
+
 union quat
 {
     struct { f32 x, y, z, w; };
@@ -142,6 +147,8 @@ union quat
     operator f32*() { return data; }
     operator const f32*() const { return data; }
 };
+
+#define quat_identity quat{ 0, 0, 0, 1 }
 
 struct mat4
 {
@@ -153,16 +160,37 @@ struct mat4
 
 inline quat vec3RotDiffQuat(vec3 v1, vec3 v2)
 {
+    bx::vec3Norm(v1, v1);
+    bx::vec3Norm(v2, v2);
+    const f32 d = bx::vec3Dot(v1, v2);
+
+    if(d > 0.999999f) {
+        return quat_identity;
+    }
+    if(d < -0.99999f) {
+        quat q;
+        vec3 right;
+        vec3 up = {0, 0, 1};
+        bx::vec3Cross(right, v1, up);
+        if(bx::vec3Length(right) < 0.0001f) {
+            vec3 xv = {1, 0, 0};
+            bx::vec3Cross(right, v1, xv);
+        }
+        assert(bx::vec3Length(right) > 0.0001f);
+        bx::quatRotateAxis(q, right, bx::kPi);
+        return q;
+    }
+
     vec3 c;
     bx::vec3Cross(c, v2, v1);
-    f32 v1Len = bx::vec3Length(v1);
-    f32 v2Len = bx::vec3Length(v2);
+    f32 s = bx::sqrt((1.0f + d) * 2.0f);
+    f32 invs = 1.0f / s;
 
     quat q;
-    q.x = c.x;
-    q.y = c.y;
-    q.z = c.z;
-    q.w = bx::sqrt((v1Len * v1Len) * (v2Len * v2Len)) + bx::vec3Dot(v1, v2);
+    q.x = c.x * invs;
+    q.y = c.y * invs;
+    q.z = c.z * invs;
+    q.w = s * 0.5f;
     bx::quatNorm(q, q);
     return q;
 }
