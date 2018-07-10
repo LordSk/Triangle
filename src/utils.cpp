@@ -58,3 +58,24 @@ bgfx::ProgramHandle loadProgram(bx::FileReaderI* _reader, const char* _vsName, c
 
     return bgfx::createProgram(vsh, fsh, true /* destroy shaders when program is destroyed */);
 }
+
+static u32 state32 = 0x123456;
+u32 xorshift32()
+{
+    u32 x = state32;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    state32 = x;
+    return x;
+}
+
+f64 rand01()
+{
+    return (f64)xorshift32()/0xFFFFFFFF;
+}
+
+f64 rand1h()
+{
+    return rand01() * 2.0 - 1.0;
+}

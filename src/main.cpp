@@ -380,10 +380,25 @@ void initGame()
 
     Collider col;
     OrientedBoundingBox obb;
-    obb.origin = vec3{10, 10, -10};
+    obb.origin = vec3{10, 10, -5};
     obb.size = vec3{10, 20, 5};
-    obb.angle = 0;
+    obb.angle = bx::kPiQuarter;
     room.physWorld.addStaticCollider(col.makeObb(obb));
+
+    for(i32 i = 0; i < 40; i++) {
+        Collider col;
+        CircleBound cb;
+        cb.center = vec3{f32(10 + rand01() * 90), f32(10 + rand01() * 40), 0};
+        cb.radius = 1.0 + rand01() * 3;
+        PhysBody ball;
+        ball.col = col.makeCb(cb);
+        f32 a = rand01() * bx::kPi2;
+        f32 speed = 10 + rand01() * 50;
+        ball.vel = { cos(a) * speed, sin(a) * speed, 0 };
+        ball.pos = cb.center;
+        ball.bounceStrength = 1.0;
+        room.physWorld.addDynamicBody(ball);
+    }
 }
 
 void cleanUp()
@@ -526,13 +541,16 @@ void update(f64 delta)
 {
     updateUI(delta);
 
-    /*physWorldTimeAcc += delta;
+    physWorldTimeAcc += delta;
     if(physWorldTimeAcc >= PHYS_UPDATE_DELTA) {
-        room.physWorld.update(PHYS_UPDATE_DELTA, 1);
+        room.physWorld.update(PHYS_UPDATE_DELTA, 10);
         physWorldTimeAcc = 0;
-    }*/
+    }
 
-    room.physWorld.update(delta, 1);
+    /*if(delta > PHYS_UPDATE_DELTA) {
+        delta = PHYS_UPDATE_DELTA;
+    }
+    room.physWorld.update(delta, 10);*/
 
     dbgDrawLine({0, 0, 0}, {10, 0, 0}, vec4{0, 0, 1, 1}, 0.1f);
     dbgDrawLine({0, 0, 0}, {0, 10, 0}, vec4{0, 1, 0, 1}, 0.1f);

@@ -67,6 +67,7 @@ struct CollisionInfo
 struct PhysBody
 {
     Collider col;
+    vec3 prevPos;
     vec3 pos;
     vec3 vel;
     f32 weight;

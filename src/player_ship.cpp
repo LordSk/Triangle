@@ -70,7 +70,7 @@ void PlayerShip::update(f64 delta, f64 physWorldAlpha)
         body->vel = body->vel * (1.0 - bx::clamp(20.0 * delta, 0.0, 1.0));
     }
 
-    bx::vec3Lerp(tf.pos, body->pos, body->pos + body->vel * PHYS_UPDATE_DELTA, physWorldAlpha);
+    bx::vec3Lerp(tf.pos, body->prevPos, body->pos, physWorldAlpha);
 
     angle = bx::atan2(-(mousePosWorld.y - tf.pos.y), mousePosWorld.x - tf.pos.x);
     bx::quatRotateZ(tf.rot, angle);

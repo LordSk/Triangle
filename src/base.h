@@ -83,5 +83,5 @@ inline bx::AllocatorI* getDefaultAllocator()
     return &g_allocator;
 }
 
-#define PHYS_UPDATE_DELTA (1.0 / 60.0)
+#define PHYS_UPDATE_DELTA (1.0 / 120.0)
 

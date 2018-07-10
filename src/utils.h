@@ -119,3 +119,7 @@ const bgfx::Memory* loadMem(bx::FileReaderI* _reader, const char* _filePath);
 bgfx::ShaderHandle loadShader(bx::FileReaderI* _reader, const char* _name);
 bgfx::ProgramHandle loadProgram(bx::FileReaderI* _reader, const char* _vsName, const char* _fsName);
 
+u32 xorshift32();
+f64 rand01();
+f64 rand1h();
+
