@@ -57,12 +57,12 @@ void PlayerShip::update(f64 delta, f64 physWorldAlpha)
 {
     assert(body);
     f64 speed = 20;
-    vec3 dir = {0, 0, 0};
+    vec2 dir;
     dir.x = (input.right - input.left);
     dir.y = (input.up - input.down);
 
-    if(bx::vec3Length(dir) > 0) {
-        bx::vec3Norm(dir, dir);
+    if(vec2Len(dir) > 0) {
+        dir = vec2Norm(dir);
         body->vel = dir * speed;
     }
     else {
@@ -70,7 +70,9 @@ void PlayerShip::update(f64 delta, f64 physWorldAlpha)
         body->vel = body->vel * (1.0 - bx::clamp(20.0 * delta, 0.0, 1.0));
     }
 
-    bx::vec3Lerp(tf.pos, body->prevPos, body->pos, physWorldAlpha);
+    vec2 pos2 = vec2Lerp(body->prevPos, body->pos, physWorldAlpha);
+    tf.pos.x = pos2.x;
+    tf.pos.y = pos2.y;
 
     angle = bx::atan2(-(mousePosWorld.y - tf.pos.y), mousePosWorld.x - tf.pos.x);
     bx::quatRotateZ(tf.rot, angle);

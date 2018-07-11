@@ -114,7 +114,8 @@ inline vec2 operator-(const vec2& v1, const vec2& v2) {
     return v;
 }
 
-inline vec2 operator*(vec2 v, f32 scalar) {
+inline vec2 operator*(const vec2& v1, f32 scalar) {
+    vec2 v = v1;
     v.x *= scalar;
     v.y *= scalar;
     return v;
@@ -138,6 +139,28 @@ inline vec2 vec2Norm(vec2 v1)
 inline vec3 vec2ToVec3(vec2 v1)
 {
     return vec3{ v1.x, v1.y, 0 };
+}
+
+inline vec2 vec3ToVec2(vec3 v1)
+{
+    return vec2{ v1.x, v1.y };
+}
+
+inline vec2 vec2Rotate(vec2 v1, f32 angle)
+{
+    f32 c = bx::cos(angle);
+    f32 s = -bx::sin(angle); // FIXME: quaternion is left-handed while world is RH and vice-versa
+    f32 tx = v1.x;
+    f32 ty = v1.y;
+    vec2 v;
+    v.x = (c * tx) - (s * ty);
+    v.y = (s * tx) + (c * ty);
+    return v;
+}
+
+inline vec2 vec2Lerp(vec2 v1, vec2 v2, f32 l)
+{
+    return v1 + (v2 - v1) * l;
 }
 
 union quat

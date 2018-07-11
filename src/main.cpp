@@ -99,21 +99,21 @@ struct Room
 
         Collider colWall;
         OrientedBoundingBox obbWall;
-        obbWall.origin = vec3{ 0, -cubeSize * 0.5f, -size.z };
-        obbWall.size = vec3{ size.x, cubeSize * 0.5f, size.z };
+        obbWall.origin = vec2{ 0, -cubeSize * 0.5f };
+        obbWall.size = vec2{ size.x, cubeSize * 0.5f };
         obbWall.angle = 0;
         physWorld.addStaticCollider(colWall.makeObb(obbWall));
 
-        obbWall.origin = vec3{ 0, size.y, -size.z };
-        obbWall.size = vec3{ size.x, cubeSize * 0.5f, size.z };
+        obbWall.origin = vec2{ 0, size.y };
+        obbWall.size = vec2{ size.x, cubeSize * 0.5f };
         physWorld.addStaticCollider(colWall.makeObb(obbWall));
 
-        obbWall.origin = vec3{ -cubeSize * 0.5f, 0, -size.z };
-        obbWall.size = vec3{ cubeSize * 0.5f, size.y, size.z };
+        obbWall.origin = vec2{ -cubeSize * 0.5f, 0 };
+        obbWall.size = vec2{ cubeSize * 0.5f, size.y };
         physWorld.addStaticCollider(colWall.makeObb(obbWall));
 
-        obbWall.origin = vec3{ size.x, 0, -size.z };
-        obbWall.size = vec3{ cubeSize * 0.5f, size.y, size.z };
+        obbWall.origin = vec2{ size.x, 0 };
+        obbWall.size = vec2{ cubeSize * 0.5f, size.y };
         physWorld.addStaticCollider(colWall.makeObb(obbWall));
     }
 
@@ -371,8 +371,8 @@ void initGame()
     cameraId = CameraID::PLAYER_VIEW;
 
     PhysBody body = {};
-    body.col.makeCb(CircleBound{ vec3{0, 0, 0}, 2.0f });
-    body.pos = vec3{ 10, 10, 0 };
+    body.col.makeCb(CircleBound{ vec2{0, 0}, 2.0f });
+    body.pos = vec2{ 10, 10 };
     body.weight = 1.0;
     body.bounceStrength = 0.0;
     playerBody = room.physWorld.addDynamicBody(body);
@@ -380,21 +380,21 @@ void initGame()
 
     Collider col;
     OrientedBoundingBox obb;
-    obb.origin = vec3{10, 10, -5};
-    obb.size = vec3{10, 20, 5};
+    obb.origin = vec2{10, 10};
+    obb.size = vec2{10, 20};
     obb.angle = bx::kPiQuarter;
     room.physWorld.addStaticCollider(col.makeObb(obb));
 
     for(i32 i = 0; i < 40; i++) {
         Collider col;
         CircleBound cb;
-        cb.center = vec3{f32(10 + rand01() * 90), f32(10 + rand01() * 40), 0};
+        cb.center = vec2{f32(10 + rand01() * 90), f32(10 + rand01() * 40)};
         cb.radius = 1.0 + rand01() * 3;
         PhysBody ball;
         ball.col = col.makeCb(cb);
         f32 a = rand01() * bx::kPi2;
         f32 speed = 10 + rand01() * 50;
-        ball.vel = { cos(a) * speed, sin(a) * speed, 0 };
+        ball.vel = { cos(a) * speed, sin(a) * speed };
         ball.pos = cb.center;
         ball.bounceStrength = 1.0;
         room.physWorld.addDynamicBody(ball);
@@ -588,6 +588,9 @@ void update(f64 delta)
     f32 time = (f32)((bx::getHPCounter()-timeOffset)/f64(bx::getHPFrequency()));
 
     room.dbgDraw();
+
+    vec2 v = vec2Rotate({5, 10 }, time);
+    dbgDrawLine({0, 0, 0}, vec2ToVec3(v), vec4{1, 1, 1, 1});
 
     if(showUI) {
         imguiEndFrame();

@@ -5,14 +5,14 @@
 
 struct OrientedBoundingBox
 {
-    vec3 origin;
-    vec3 size;
+    vec2 origin;
+    vec2 size;
     f32 angle;
 };
 
 struct CircleBound
 {
-    vec3 center;
+    vec2 center;
     f32 radius;
 };
 
@@ -42,20 +42,20 @@ struct Collider
         return *this;
     }
 
-    inline void setPos(vec3 pos) {
+    inline void setPos(vec2 pos) {
         switch(type) {
             case OBB: obb.origin = pos; break;
             case CIRCLE: cb.center = pos; break;
         }
     }
 
-    inline vec3 getPos() const {
+    inline vec2 getPos() const {
         switch(type) {
             case OBB: return obb.origin;
             case CIRCLE: return cb.center;
         }
         assert(0);
-        return vec3{};
+        return vec2{};
     }
 };
 
@@ -67,9 +67,9 @@ struct CollisionInfo
 struct PhysBody
 {
     Collider col;
-    vec3 prevPos;
-    vec3 pos;
-    vec3 vel;
+    vec2 prevPos;
+    vec2 pos;
+    vec2 vel;
     f32 weight;
     f32 bounceStrength;
 };
