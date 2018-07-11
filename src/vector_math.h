@@ -2,6 +2,12 @@
 
 #include "base.h"
 #include <bx/math.h>
+#include <math.h>
+
+inline f32 signf(f32 f)
+{
+    return f < 0.0f ? -1.0f : 1.0f;
+}
 
 union vec4
 {
@@ -101,17 +107,11 @@ union vec2
 };
 
 inline vec2 operator+(const vec2& v1, const vec2& v2) {
-    vec2 v = v1;
-    v.x += v2.x;
-    v.y += v2.y;
-    return v;
+    return vec2{ v1.x + v2.x, v1.y + v2.y };
 }
 
 inline vec2 operator-(const vec2& v1, const vec2& v2) {
-    vec2 v = v1;
-    v.x -= v2.x;
-    v.y -= v2.y;
-    return v;
+    return vec2{ v1.x - v2.x, v1.y - v2.y };
 }
 
 inline vec2 operator*(const vec2& v1, f32 scalar) {
@@ -128,7 +128,7 @@ inline f32 vec2Dot(vec2 v1, vec2 v2)
 
 inline f32 vec2Len(vec2 v)
 {
-    return bx::sqrt(v.x * v.x + v.y * v.y);
+    return sqrtf(v.x * v.x + v.y * v.y);
 }
 
 inline vec2 vec2Norm(vec2 v1)
@@ -146,19 +146,33 @@ inline vec2 vec3ToVec2(vec3 v1)
     return vec2{ v1.x, v1.y };
 }
 
-inline vec2 vec2Rotate(vec2 v1, f32 angle)
+inline vec2 vec2Rotate(const vec2& v1, f32 angle)
 {
-    f32 c = bx::cos(angle);
-    f32 s = -bx::sin(angle); // FIXME: quaternion is left-handed while world is RH and vice-versa
-    f32 tx = v1.x;
-    f32 ty = v1.y;
+    const f32 c = cosf(angle);
+    // FIXME: quaternion rotation is left-handed(?) while world is RH and vice-versa
+    const f32 s = -sinf(angle);
+    const f32 tx = v1.x;
+    const f32 ty = v1.y;
     vec2 v;
     v.x = (c * tx) - (s * ty);
     v.y = (s * tx) + (c * ty);
     return v;
 }
 
-inline vec2 vec2Lerp(vec2 v1, vec2 v2, f32 l)
+inline vec2 vec2Rotate(const vec2& v1, f32 cos_a, f32 sin_a)
+{
+    const f32 c = cos_a;
+    // FIXME: quaternion rotation is left-handed(?) while world is RH and vice-versa
+    const f32 s = -sin_a;
+    const f32 tx = v1.x;
+    const f32 ty = v1.y;
+    vec2 v;
+    v.x = (c * tx) - (s * ty);
+    v.y = (s * tx) + (c * ty);
+    return v;
+}
+
+inline vec2 vec2Lerp(const vec2& v1, const vec2& v2, f32 l)
 {
     return v1 + (v2 - v1) * l;
 }

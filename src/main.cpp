@@ -371,11 +371,12 @@ void initGame()
     cameraId = CameraID::PLAYER_VIEW;
 
     PhysBody body = {};
-    body.col.makeCb(CircleBound{ vec2{0, 0}, 2.0f });
+    Collider colPlayer;
+    colPlayer.makeCb(CircleBound{ vec2{0, 0}, 2.0f });
     body.pos = vec2{ 10, 10 };
     body.weight = 1.0;
     body.bounceStrength = 0.0;
-    playerBody = room.physWorld.addDynamicBody(body);
+    playerBody = room.physWorld.addDynamicBody(colPlayer, body);
     playerShip.body = playerBody;
 
     Collider col;
@@ -385,19 +386,18 @@ void initGame()
     obb.angle = bx::kPiQuarter;
     room.physWorld.addStaticCollider(col.makeObb(obb));
 
-    for(i32 i = 0; i < 40; i++) {
+    for(i32 i = 0; i < 100; i++) {
         Collider col;
         CircleBound cb;
         cb.center = vec2{f32(10 + rand01() * 90), f32(10 + rand01() * 40)};
-        cb.radius = 1.0 + rand01() * 3;
+        cb.radius = 1.0 + rand01() * 1;
         PhysBody ball;
-        ball.col = col.makeCb(cb);
         f32 a = rand01() * bx::kPi2;
         f32 speed = 10 + rand01() * 50;
         ball.vel = { cos(a) * speed, sin(a) * speed };
         ball.pos = cb.center;
         ball.bounceStrength = 1.0;
-        room.physWorld.addDynamicBody(ball);
+        room.physWorld.addDynamicBody(col.makeCb(cb), ball);
     }
 }
 
@@ -543,7 +543,11 @@ void update(f64 delta)
 
     physWorldTimeAcc += delta;
     if(physWorldTimeAcc >= PHYS_UPDATE_DELTA) {
+#ifdef CONF_DEBUG
+        room.physWorld.update(PHYS_UPDATE_DELTA, 2);
+#else
         room.physWorld.update(PHYS_UPDATE_DELTA, 10);
+#endif
         physWorldTimeAcc = 0;
     }
 

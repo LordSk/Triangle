@@ -83,7 +83,6 @@ solution "Triangle solution"
 		"EnableSSE",
 		"EnableSSE2",
 		"EnableAVX",
-		"EnableAVX2",
         "StaticRuntime"
 	}
 	

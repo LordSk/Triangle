@@ -5,78 +5,78 @@
 // sepearatig axis theorem
 bool obbIntersectObb(const OrientedBoundingBox& obbA, const OrientedBoundingBox& obbB, CollisionInfo* out)
 {
-    const f32 cosA = bx::cos(obbA.angle);
-    const f32 sinA = bx::sin(obbA.angle);
-    const f32 cosB = bx::cos(obbB.angle);
-    const f32 sinB = bx::sin(obbB.angle);
+    const f32 cosA = cosf(obbA.angle);
+    const f32 sinA = sinf(obbA.angle);
+    const f32 cosB = cosf(obbB.angle);
+    const f32 sinB = sinf(obbB.angle);
 
-    vec2 pmaxA = vec2Rotate(obbA.size, obbA.angle);
-    vec2 pmaxB = vec2Rotate(obbB.size, obbB.angle);
+    const vec2 pmaxA = vec2Rotate(obbA.size, cosA, sinA);
+    const vec2 pmaxB = vec2Rotate(obbB.size, cosB, sinB);
 
     // A
-    vec2 centerA = obbA.origin + pmaxA * 0.5f;
-    vec2 xA = vec2{ cosA, -sinA };
-    vec2 yA = vec2{ sinA, cosA };
-    f32 halfWidthA = obbA.size.x * 0.5f;
-    f32 halfHeightA = obbA.size.y * 0.5f;
+    const vec2 centerA = obbA.origin + pmaxA * 0.5f;
+    const vec2 xA = vec2{ cosA, -sinA };
+    const vec2 yA = vec2{ sinA, cosA };
+    const f32 halfWidthA = obbA.size.x * 0.5f;
+    const f32 halfHeightA = obbA.size.y * 0.5f;
 
     // B
-    vec2 centerB = obbB.origin + pmaxB * 0.5f;
-    vec2 xB = vec2{ cosB, -sinB };
-    vec2 yB = vec2{ sinB, cosB };
-    f32 halfWidthB = obbB.size.x * 0.5f;
-    f32 halfHeightB = obbB.size.y * 0.5f;
+    const vec2 centerB = obbB.origin + pmaxB * 0.5f;
+    const vec2 xB = vec2{ cosB, -sinB };
+    const vec2 yB = vec2{ sinB, cosB };
+    const f32 halfWidthB = obbB.size.x * 0.5f;
+    const f32 halfHeightB = obbB.size.y * 0.5f;
 
-    vec2 T = centerB - centerA;
+    const vec2 T = centerB - centerA;
 
     //| T • Ax | > WA + | ( WB*Bx ) • Ax | + |( HB*By ) • Ax |
-    f32 dxA = vec2Dot(T, xA);
-    f32 cmp = halfWidthA + bx::abs(vec2Dot(xB * halfWidthB, xA)) + bx::abs(vec2Dot(yB * halfHeightB, xA));
-    if(bx::abs(dxA) > cmp) {
+    const f32 dxA = vec2Dot(T, xA);
+    const f32 cmpxA = halfWidthA + abs(vec2Dot(xB * halfWidthB, xA)) + abs(vec2Dot(yB * halfHeightB, xA));
+    if(abs(dxA) > cmpxA) {
         return false;
     }
 
-    const vec2 pvxA = xA * ((bx::abs(dxA) - cmp) * bx::sign(dxA));
+    //| T • Ay | > HA + | ( WB*Bx ) • Ay | + |( HB*By ) • Ay |
+    const f32 dyA = vec2Dot(T, yA);
+    const f32 cmpyA = halfHeightA + abs(vec2Dot(xB * halfWidthB, yA)) + abs(vec2Dot(yB * halfHeightB, yA));
+    if(abs(dyA) > cmpyA) {
+        return false;
+    }
+
+    //| T • Bx | > | ( WA* Ax ) • Bx | + | ( HA*Ay ) • Bx | + WB
+    const f32 dxB = vec2Dot(T, xB);
+    const f32 cmpxB = halfWidthB + abs(vec2Dot(xA * halfWidthA, xB)) + abs(vec2Dot(yA * halfHeightA, xB));
+    if(abs(dxB) > cmpxB) {
+        return false;
+    }
+
+    //| T • By | > | ( WA* Ax ) • By | + | ( HA*Ay ) • By | + HB
+    const f32 dyB = vec2Dot(T, yB);
+    const f32 cmpyB = halfHeightB + abs(vec2Dot(xA * halfWidthA, yB)) + abs(vec2Dot(yA * halfHeightA, yB));
+    if(abs(dyB) > cmpyB) {
+        return false;
+    }
+
+    const vec2 pvxA = xA * ((abs(dxA) - cmpxA) * signf(dxA));
     const f32 pvxAlen = vec2Len(pvxA);
     vec2 pv = pvxA;
     f32 pvLen = pvxAlen;
 
-    //| T • Ay | > HA + | ( WB*Bx ) • Ay | + |( HB*By ) • Ay |
-    f32 dyA = vec2Dot(T, yA);
-    cmp = halfHeightA + bx::abs(vec2Dot(xB * halfWidthB, yA)) + bx::abs(vec2Dot(yB * halfHeightB, yA));
-    if(bx::abs(dyA) > cmp) {
-        return false;
-    }
-
-    const vec2 pvyA = yA * ((bx::abs(dyA) - cmp) * bx::sign(dyA));
+    const vec2 pvyA = yA * ((abs(dyA) - cmpyA) * signf(dyA));
     const f32 pvyAlen = vec2Len(pvyA);
     if(pvyAlen < pvLen) {
         pv = pvyA;
         pvLen = pvyAlen;
     }
 
-    //| T • Bx | > | ( WA* Ax ) • Bx | + | ( HA*Ay ) • Bx | + WB
-    f32 dxB = vec2Dot(T, xB);
-    cmp = halfWidthB + bx::abs(vec2Dot(xA * halfWidthA, xB)) + bx::abs(vec2Dot(yA * halfHeightA, xB));
-    if(bx::abs(dxB) > cmp) {
-        return false;
-    }
-
-    const vec2 pvxB = xB * ((bx::abs(dxB) - cmp) * bx::sign(dxB));
+    const vec2 pvxB = xB * ((abs(dxB) - cmpxB) * signf(dxB));
     const f32 pvxBlen = vec2Len(pvxB);
     if(pvxBlen < pvLen) {
         pv = pvxB;
         pvLen = pvxBlen;
     }
 
-    //| T • By | > | ( WA* Ax ) • By | + | ( HA*Ay ) • By | + HB
-    f32 dyB = vec2Dot(T, yB);
-    cmp = halfHeightB + bx::abs(vec2Dot(xA * halfWidthA, yB)) + bx::abs(vec2Dot(yA * halfHeightA, yB));
-    if(bx::abs(dyB) > cmp) {
-        return false;
-    }
-
-    const vec2 pvyB = yB * ((bx::abs(dyB) - cmp) * bx::sign(dyB));
+    const vec2 pvyB = yB * ((abs(dyB) - cmpyB) * signf(dyB));
     const f32 pvyBlen = vec2Len(pvyB);
     if(pvyBlen < pvLen) {
         pv = pvyB;
@@ -91,10 +91,10 @@ bool obbIntersectObb(const OrientedBoundingBox& obbA, const OrientedBoundingBox&
 bool obbIntersectCb(const OrientedBoundingBox& obbA, const CircleBound& cbB, CollisionInfo* out)
 {
     const f32 obbA_angle = obbA.angle;
-    const f32 cosA = bx::cos(obbA_angle);
-    const f32 sinA = bx::sin(obbA_angle);
+    const f32 cosA = cosf(obbA_angle);
+    const f32 sinA = sinf(obbA_angle);
 
-    vec2 pmaxA = vec2Rotate(obbA.size, obbA_angle);
+    const vec2 pmaxA = vec2Rotate(obbA.size, cosA, sinA);
 
     // A
     const vec2 xA = vec2{ cosA, -sinA };
@@ -104,21 +104,25 @@ bool obbIntersectCb(const OrientedBoundingBox& obbA, const CircleBound& cbB, Col
     const f32 halfHeightA = obbA.size.y * 0.5f;
     const f32 halfDiagA = vec2Len(obbA.size) * 0.5;
 
-    vec2 vecs[3];
-    vecs[0] = { obbA.size.x, 0 };
-    vecs[1] = { 0, obbA.size.y };
-    vecs[2] = { obbA.size.x, obbA.size.y };
-    vec2 rotatedVecs[3];
-    rotatedVecs[0] = vec2Rotate(vecs[0], obbA_angle);
-    rotatedVecs[1] = vec2Rotate(vecs[1], obbA_angle);
-    rotatedVecs[2] = vec2Rotate(vecs[2], obbA_angle);
+    const vec2 vecs[3] = {
+        vec2{ obbA.size.x, 0 },
+        vec2{ 0, obbA.size.y },
+        vec2{ obbA.size.x, obbA.size.y }
+    };
+
+    const vec2 rotatedVecs[3] = {
+        vec2Rotate(vecs[0], cosA, sinA),
+        vec2Rotate(vecs[1], cosA, sinA),
+        vec2Rotate(vecs[2], cosA, sinA)
+    };
 
     const vec2 orgnA = obbA.origin;
-    vec2 points[4];
-    points[0] = orgnA;
-    points[1] = orgnA + rotatedVecs[0];
-    points[2] = orgnA + rotatedVecs[1];
-    points[3] = orgnA + rotatedVecs[2];
+    const vec2 points[4] = {
+        orgnA,
+        orgnA + rotatedVecs[0],
+        orgnA + rotatedVecs[1],
+        orgnA + rotatedVecs[2]
+    };
 
     const vec2 centerB = cbB.center;
     const vec2 T = centerB - centerA;
@@ -134,39 +138,39 @@ bool obbIntersectCb(const OrientedBoundingBox& obbA, const CircleBound& cbB, Col
     }
 
     // | T • Ax | > WA + | ( WB*Bx ) • Ax | + |( HB*By ) • Ax |
-    f32 dxA = vec2Dot(T, xA);
-    f32 cmp = halfWidthA + cbB.radius;
-    if(bx::abs(dxA) > cmp) {
+    const f32 dxA = vec2Dot(T, xA);
+    const f32 cmpxA = halfWidthA + cbB.radius;
+    if(abs(dxA) > cmpxA) {
         return false;
     }
 
-    const vec2 pvxA = xA * ((bx::abs(dxA) - cmp) * bx::sign(dxA));
+    // | T • Ay | > HA + | ( WB*Bx ) • Ay | + |( HB*By ) • Ay |
+    const f32 dyA = vec2Dot(T, yA);
+    const f32 cmpyA = halfHeightA + cbB.radius;
+    if(abs(dyA) > cmpyA) {
+        return false;
+    }
+
+    const vec2 uA = vec2Norm(closestPoint - centerA);
+    const f32 duA = vec2Dot(T, uA);
+    const f32 cmpuA = halfDiagA + cbB.radius;
+    if(abs(duA) > cmpuA) {
+        return false;
+    }
+
+    const vec2 pvxA = xA * ((abs(dxA) - cmpxA) * signf(dxA));
     const f32 pvxAlen = vec2Len(pvxA);
     vec2 pv = pvxA;
     f32 pvLen = pvxAlen;
 
-    // | T • Ay | > HA + | ( WB*Bx ) • Ay | + |( HB*By ) • Ay |
-    f32 dyA = vec2Dot(T, yA);
-    cmp = halfHeightA + cbB.radius;
-    if(bx::abs(dyA) > cmp) {
-        return false;
-    }
-
-    const vec2 pvyA = yA * ((bx::abs(dyA) - cmp) * bx::sign(dyA));
+    const vec2 pvyA = yA * ((abs(dyA) - cmpyA) * signf(dyA));
     const f32 pvyAlen = vec2Len(pvyA);
     if(pvyAlen < pvLen) {
         pv = pvyA;
         pvLen = pvyAlen;
     }
 
-    const vec2 uA = vec2Norm(closestPoint - centerA);
-    f32 duA = vec2Dot(T, uA);
-    cmp = halfDiagA + cbB.radius;
-    if(bx::abs(duA) > cmp) {
-        return false;
-    }
-
-    const vec2 pvuA = uA * ((bx::abs(duA) - cmp) * bx::sign(duA));
+    const vec2 pvuA = uA * ((abs(duA) - cmpuA) * signf(duA));
     const f32 pvuAlen = vec2Len(pvuA);
     if(pvuAlen < pvLen) {
         pv = pvuA;
@@ -174,20 +178,6 @@ bool obbIntersectCb(const OrientedBoundingBox& obbA, const CircleBound& cbB, Col
     }
 
     out->penVec = pv;
-
-    /*
-    ImGui::Begin("intersect");
-    ImGui::Text("dxA: %.5f", dxA);
-    ImGui::TextColored(ImVec4(0, 0, 1, 1), "pvxA: { %.5f, %.5f }", pvxA.x, pvxA.y);
-    ImGui::Text("dyA: %.5f", dyA);
-    ImGui::Text("duA: %.5f", duA);
-    ImGui::End();
-
-    dbgDrawLine(vec2ToVec3(centerA), vec2ToVec3(centerB), vec4{0.5, 0, 1, 1});
-    dbgDrawLine(obbA.origin, obbA.origin + vec2ToVec3(pvxA), vec4{0, 0, 1, 1});
-    dbgDrawLine(obbA.origin, obbA.origin + vec2ToVec3(pvyA), vec4{0, 1, 0, 1});
-    dbgDrawLine(obbA.origin, obbA.origin + vec2ToVec3(pvuA), vec4{1, 0, 0, 1});
-    */
 
     return true;
 }
@@ -277,13 +267,14 @@ void colliderDbgDraw(const Collider& col1, vec4 color)
 PhysWorld::PhysWorld()
 {
     colStatic.reserve(512);
-    bodies.reserve(512);
+    colDynamic.reserve(512);
+    bodyDyn.reserve(512);
 }
 
 void PhysWorld::clear()
 {
     colStatic.clear();
-    bodies.clear();
+    bodyDyn.clear();
 }
 
 Collider* PhysWorld::addStaticCollider(Collider col)
@@ -291,17 +282,30 @@ Collider* PhysWorld::addStaticCollider(Collider col)
     return &(colStatic.push(col));
 }
 
-PhysBody* PhysWorld::addDynamicBody(PhysBody body)
+PhysBody* PhysWorld::addDynamicBody(Collider col, PhysBody body)
 {
-    return &(bodies.push(body));
+    colDynamic.push(col);
+    return &(bodyDyn.push(body));
 }
 
 void PhysWorld::update(f64 delta, const i32 stepCount)
 {
     const i32 statCount = colStatic.count();
     Collider* statBodies = colStatic.data();
-    const i32 dynCount = bodies.count();
-    PhysBody* dynBodies = bodies.data();
+    const i32 dynColCount = colDynamic.count();
+    Collider* dynColliders = colDynamic.data();
+    const i32 dynCount = bodyDyn.count();
+    PhysBody* dynBodies = bodyDyn.data();
+
+    struct CollisionEvent {
+        PhysBody* body1;
+        PhysBody* body2;
+        vec2 pv;
+    };
+
+    assert(dynCount <= 2048);
+    CollisionEvent ceList[2048];
+    i32 ceListCount = 0;
 
     for(i32 db = 0; db < dynCount; db++) {
         PhysBody& body = dynBodies[db];
@@ -309,64 +313,121 @@ void PhysWorld::update(f64 delta, const i32 stepCount)
     }
 
     for(i32 step = 0; step < stepCount; step++) {
+        bool8 collided[2048] = {0};
+
         for(i32 db = 0; db < dynCount; db++) {
             PhysBody& body = dynBodies[db];
+            Collider& col1 = dynColliders[db];
             body.pos += body.vel * (delta * (1.0 / stepCount));
-            body.col.setPos(body.pos);
+            col1.setPos(body.pos);
+        }
 
+        for(i32 db = 0; db < dynCount; db++) {
+            if(collided[db]) continue;
+
+            PhysBody* pBody = &dynBodies[db];
+            Collider& col1 = dynColliders[db];
+
+            bool collidedWithStatic = false;
             for(i32 sb = 0; sb < statCount; sb++) {
                 CollisionInfo coliInfo;
-                if(colliderIntersect(body.col, statBodies[sb], &coliInfo) &&
+                if(colliderIntersect(col1, statBodies[sb], &coliInfo) &&
                    vec2Len(coliInfo.penVec) > 0.0001f) {
-                    const vec2 pv = coliInfo.penVec;
-                    const f32 d = vec2Dot(body.vel, pv);
-                    vec2 rem = pv * (d / vec2Dot(pv, pv));
-                    body.vel -= rem + rem * body.bounceStrength;
-                    body.pos -= pv * 1.0001f;
-                    body.col.setPos(body.pos);
+                    CollisionEvent ce;
+                    ce.pv = coliInfo.penVec;
+                    ce.body1 = nullptr;
+                    ce.body2 = pBody;
+                    assert(ceListCount < arr_count(ceList));
+                    ceList[ceListCount++] = ce;
+                    collidedWithStatic = true;
                 };
+            }
+
+            if(collidedWithStatic) {
+                collided[db] = true;
+                continue;
             }
 
             for(i32 db2 = 0; db2 < dynCount; db2++) {
-                PhysBody& body2 = dynBodies[db2];
+                if(collided[db2]) continue;
+
+                PhysBody* pBody2 = &dynBodies[db2];
+                Collider& col2 = dynColliders[db2];
 
                 // TODO: implement weight
                 CollisionInfo coliInfo;
-                if(colliderIntersect(body.col, body2.col, &coliInfo) &&
+                if(colliderIntersect(col1, col2, &coliInfo) &&
                    vec2Len(coliInfo.penVec) > 0.0001f) {
-                    const vec2 pv = coliInfo.penVec;
-                    const f32 d = vec2Dot(body.vel, pv);
-                    const f32 d2 = vec2Dot(body2.vel, pv);
-                    vec2 rem = pv * (d / vec2Dot(pv, pv));
-                    vec2 rem2 = pv * (d2 / vec2Dot(pv, pv));
-                    body.vel -= rem + rem * body.bounceStrength;
-                    body2.vel -= rem2 + rem2 * body.bounceStrength;
-                    body.pos -= pv * 0.5001f;
-                    body2.pos += pv * 0.5001f;
-                    body.col.setPos(body.pos);
-                    body2.col.setPos(body2.pos);
+                    CollisionEvent ce;
+                    ce.pv = coliInfo.penVec;
+                    ce.body1 = pBody;
+                    ce.body2 = pBody2;
+                    assert(ceListCount < arr_count(ceList));
+                    ceList[ceListCount++] = ce;
+                    collided[db] = true;
+                    collided[db2] = true;
+                    break;
                 };
             }
         }
+
+        const i32 ceCount = ceListCount;
+        for(i32 c = 0; c < ceCount; c++) {
+            CollisionEvent& ce = ceList[c];
+
+            if(!ce.body1) {
+                const vec2 pv = ce.pv;
+                vec2& body_pos = ce.body2->pos;
+                vec2& body_vel = ce.body2->vel;
+                const f32 body_bounceStr = ce.body2->bounceStrength;
+
+                const f32 d = vec2Dot(body_vel, pv);
+                vec2 rem = pv * (d / vec2Dot(pv, pv));
+                body_vel -= rem + rem * body_bounceStr;
+                body_pos -= pv * 1.0001f;
+            }
+            else {
+                const vec2 pv = ce.pv;
+                vec2& body_pos = ce.body1->pos;
+                vec2& body_vel = ce.body1->vel;
+                const f32 body_bounceStr = ce.body1->bounceStrength;
+                vec2& body2_pos = ce.body2->pos;
+                vec2& body2_vel = ce.body2->vel;
+                const f32 body2_bounceStr = ce.body2->bounceStrength;
+
+                const f32 d = vec2Dot(body_vel, pv);
+                const f32 d2 = vec2Dot(body2_vel, pv);
+
+                const vec2 rem = pv * (d / vec2Dot(pv, pv));
+                const vec2 rem2 = pv * (d2 / vec2Dot(pv, pv));
+
+                body_vel -= rem + rem * body_bounceStr;
+                body_pos -= pv * 0.5001f;
+                body2_vel -= rem2 + rem2 * body2_bounceStr;
+                body2_pos += pv * 0.5001f;
+            }
+        }
+
+        ceListCount = 0;
     }
 }
 
 void PhysWorld::dbgDraw(vec3 offset)
 {
     const i32 statCount = colStatic.count();
-    Collider* statBodies = colStatic.data();
-    const i32 dynCount = bodies.count();
-    PhysBody* dynBodies = bodies.data();
+    Collider* statColliders = colStatic.data();
+    const i32 dynCount = colDynamic.count();
+    Collider* dynColliders = colDynamic.data();
 
     for(i32 sb = 0; sb < statCount; sb++) {
-        Collider col = statBodies[sb];
+        Collider col = statColliders[sb];
         col.setPos(col.getPos() + vec3ToVec2(offset));
         colliderDbgDraw(col, vec4{0.0f, 200.f/255.f, 1.0, 0.5f});
     }
 
     for(i32 db = 0; db < dynCount; db++) {
-        Collider col = dynBodies[db].col;
+        Collider col = dynColliders[db];
         col.setPos(col.getPos() + vec3ToVec2(offset));
-        colliderDbgDraw(dynBodies[db].col, vec4{1.0f, 200.f/255.f, 0, 0.5f});
+        colliderDbgDraw(col, vec4{1.0f, 200.f/255.f, 0, 0.5f});
     }
 }

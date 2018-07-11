@@ -66,7 +66,6 @@ struct CollisionInfo
 
 struct PhysBody
 {
-    Collider col;
     vec2 prevPos;
     vec2 pos;
     vec2 vel;
@@ -77,12 +76,13 @@ struct PhysBody
 struct PhysWorld
 {
     Array<Collider> colStatic;
-    Array<PhysBody> bodies;
+    Array<Collider> colDynamic;
+    Array<PhysBody> bodyDyn;
 
     PhysWorld();
     void clear();
     Collider* addStaticCollider(Collider col);
-    PhysBody* addDynamicBody(PhysBody body);
+    PhysBody* addDynamicBody(Collider col, PhysBody body);
 
     void update(f64 delta, const i32 stepCount);
     void dbgDraw(vec3 offset);
