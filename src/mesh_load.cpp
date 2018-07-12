@@ -1,6 +1,6 @@
 #include "mesh_load.h"
 
-#include <vector>
+#include "utils.h"
 #include <ib-compress/indexbufferdecompression.h>
 #include <bx/file.h>
 #include <unordered_map>
@@ -34,7 +34,7 @@ struct Primitive
     Obb m_obb;
 };
 
-typedef std::vector<Primitive> PrimitiveArray;
+typedef Array<Primitive> PrimitiveArray;
 
 struct Group
 {
@@ -178,8 +178,9 @@ struct Mesh
 
     void unload()
     {
-        for(GroupArray::const_iterator it = m_groups.begin(), itEnd = m_groups.end(); it != itEnd; ++it) {
-            const Group& group = *it;
+        const i32 groupCount = m_groups.count();
+        for(i32 i = 0; i < groupCount; i++) {
+            const Group& group = m_groups[i];
             bgfx::destroy(group.m_vbh);
 
             if(bgfx::isValid(group.m_ibh)) {
@@ -205,13 +206,37 @@ struct Mesh
         bgfx::setTransform(_mtx);
         bgfx::setState(_state);
 
-        for(GroupArray::const_iterator it = m_groups.begin(), itEnd = m_groups.end(); it != itEnd; ++it) {
-            const Group& group = *it;
+        const i32 groupCount = m_groups.count();
+        for(i32 i = 0; i < groupCount; i++) {
+            const Group& group = m_groups[i];
 
             bgfx::setIndexBuffer(group.m_ibh);
             bgfx::setVertexBuffer(0, group.m_vbh);
-            bgfx::submit(_id, _program, 0, it != itEnd-1);
+            bgfx::submit(_id, _program, 0, i != groupCount-1);
         }
+    }
+
+    void submitGroup(bgfx::ViewId _id, i32 groupId, bgfx::ProgramHandle _program, const f32* _mtx,
+                     u64 _state) const
+    {
+        if(BGFX_STATE_MASK == _state) {
+            _state = 0
+                | BGFX_STATE_WRITE_RGB
+                | BGFX_STATE_WRITE_A
+                | BGFX_STATE_WRITE_Z
+                | BGFX_STATE_DEPTH_TEST_LESS
+                | BGFX_STATE_CULL_CCW
+                | BGFX_STATE_MSAA
+                ;
+        }
+
+        bgfx::setTransform(_mtx);
+        bgfx::setState(_state);
+
+        const Group& group = m_groups[groupId];
+        bgfx::setIndexBuffer(group.m_ibh);
+        bgfx::setVertexBuffer(0, group.m_vbh);
+        bgfx::submit(_id, _program, 0, false);
     }
 
     /*void submit(const MeshState*const* _state, uint8_t _numPasses, const float* _mtx, uint16_t _numMatrices) const
@@ -247,7 +272,7 @@ struct Mesh
     }*/
 
     bgfx::VertexDecl m_decl;
-    typedef std::vector<Group> GroupArray;
+    typedef Array<Group> GroupArray;
     GroupArray m_groups;
 };
 
@@ -297,4 +322,16 @@ void meshSubmit(MeshHandle meshHnd, bgfx::ViewId _id, bgfx::ProgramHandle _progr
     assert(g_meshHolder.meshMap.find(meshHnd) != g_meshHolder.meshMap.end());
     Mesh& mesh = g_meshHolder.meshMap[meshHnd];
     mesh.submit(_id, _program, _mtx, _state);
+}
+
+void meshSubmitGroup(MeshHandle meshHnd, i32 groupId, bgfx::ViewId _id, bgfx::ProgramHandle _program,
+                     const float* _mtx, u64 _state)
+{
+    if(meshHnd == MESH_HANDLE_INVALID) {
+        return;
+    }
+
+    assert(g_meshHolder.meshMap.find(meshHnd) != g_meshHolder.meshMap.end());
+    Mesh& mesh = g_meshHolder.meshMap[meshHnd];
+    mesh.submitGroup(_id, groupId, _program, _mtx, _state);
 }

@@ -117,7 +117,7 @@ struct Room
         physWorld.addStaticCollider(colWall.makeObb(obbWall));
     }
 
-    void dbgDraw() {
+    void dbgDrawPhysWorld() {
         physWorld.dbgDraw(tfRoom.pos);
     }
 };
@@ -199,11 +199,64 @@ struct CameraFreeFlight
     }
 };
 
+struct CameraBirdView
+{
+    vec3 pos;
+    vec3 dir = {0, 0.001f, -1.f};
+    vec3 up = {0, 0, 1.f};
+    f32 height;
+
+    void compute(mat4* lookAt) {
+        bx::vec3Norm(dir, dir);
+        vec3 eye = pos + vec3{0, 0, height};
+        vec3 at = eye + dir;
+        bx::mtxLookAtRh(*lookAt, eye, at, up);
+    }
+};
+
+struct RdrViewID {
+    enum {
+        GAME = 0,
+        UI,
+        COMBINE,
+    } Enum;
+};
+
+
 struct CameraID {
     enum {
         FREE_VIEW = 0,
         PLAYER_VIEW,
     } Enum;
+};
+
+struct PosUvVertex
+{
+    f32 x, y, z;
+    f32 u, v;
+
+    static void init()
+    {
+        decl
+            .begin()
+            .add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
+            .add(bgfx::Attrib::TexCoord0,2, bgfx::AttribType::Float)
+            .end();
+    }
+
+    static bgfx::VertexDecl decl;
+};
+
+bgfx::VertexDecl PosUvVertex::decl;
+
+static const PosUvVertex s_screenQuadVertData[6] = {
+    { -1.0f, -1.0f, 0, 0, 1 },
+    {  1.0f, -1.0f, 0, 1, 1 },
+    {  1.0f,  1.0f, 0, 1, 0 },
+
+    { -1.0f, -1.0f, 0, 0, 1 },
+    {  1.0f,  1.0f, 0, 1, 0 },
+    { -1.0f,  1.0f, 0, 0, 0 },
 };
 
 struct Application {
@@ -217,10 +270,17 @@ bgfx::ProgramHandle programVertShading;
 bgfx::ProgramHandle programVertShadingColor;
 bgfx::ProgramHandle programVertShadingColorInstance;
 bgfx::ProgramHandle programDbgColor;
+bgfx::ProgramHandle progGameFinal;
+bgfx::ProgramHandle progUiFinal;
+
 bgfx::UniformHandle u_color;
+bgfx::UniformHandle u_sdiffuse;
+
 bgfx::VertexBufferHandle cubeVbh;
 bgfx::VertexBufferHandle originVbh;
 bgfx::VertexBufferHandle gridVbh;
+bgfx::VertexBufferHandle vbhScreenQuad;
+
 i64 timeOffset;
 f64 physWorldTimeAcc = 0;
 
@@ -229,7 +289,12 @@ CameraFreeFlight cam;
 mat4 proj;
 mat4 camView;
 
-MeshHandle playerShipMesh;
+bgfx::FrameBufferHandle fbhGame;
+bgfx::FrameBufferHandle fbhUI;
+
+MeshHandle meshPlayerShip;
+MeshHandle meshEyeEn1;
+
 Room room;
 PlayerShip playerShip;
 PhysBody* playerBody;
@@ -241,6 +306,7 @@ f32 dbgScale = 1;
 f32 dbgPlayerCamHeight = 30;
 bool dbgEnableGrid = true;
 bool dbgEnableWorldOrigin = true;
+bool dbgEnableDbgPhysics = false;
 bool dbgEnableDbgDraw = true;
 
 bool init()
@@ -252,7 +318,7 @@ bool init()
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
-    window = SDL_CreateWindow("Triangle",
+    window = SDL_CreateWindow("Project T",
                               SDL_WINDOWPOS_CENTERED,
                               SDL_WINDOWPOS_CENTERED,
                               WINDOW_WIDTH, WINDOW_HEIGHT,
@@ -292,7 +358,7 @@ bool init()
     init.deviceId = 0;
     init.resolution.width  = 1600;
     init.resolution.height = 900;
-    init.resolution.reset = /*BGFX_RESET_NONE*/BGFX_RESET_MSAA_X16;
+    init.resolution.reset = BGFX_RESET_NONE;
 
     if(!bgfx::init(init)) {
         LOG("ERROR> bgfx failed to initialize");
@@ -301,13 +367,51 @@ bool init()
 
     bgfx::setDebug(BGFX_DEBUG_TEXT);
 
+    const u32 samplerFlags = 0
+                    | BGFX_TEXTURE_RT
+                    | BGFX_TEXTURE_MIN_POINT
+                    | BGFX_TEXTURE_MAG_POINT
+                    | BGFX_TEXTURE_MIP_POINT
+                    | BGFX_TEXTURE_U_CLAMP
+                    | BGFX_TEXTURE_V_CLAMP
+                    ;
+
+    static bgfx::TextureHandle fbTexGame[2];
+    fbTexGame[0] = bgfx::createTexture2D(u16(WINDOW_WIDTH), u16(WINDOW_HEIGHT), false,
+                                         1, bgfx::TextureFormat::BGRA8,
+                                         samplerFlags|BGFX_TEXTURE_SRGB|BGFX_TEXTURE_RT_MSAA_X16);
+    fbTexGame[1] = bgfx::createTexture2D(u16(WINDOW_WIDTH), u16(WINDOW_HEIGHT), false,
+                                         1, bgfx::TextureFormat::D24, samplerFlags|BGFX_TEXTURE_RT_MSAA_X16);
+    fbhGame = bgfx::createFrameBuffer(2, fbTexGame, true);
+
+    if(!bgfx::isValid(fbhGame)) {
+        LOG("ERROR> could not create game frame buffer");
+        return false;
+    }
+
+    fbhUI = bgfx::createFrameBuffer(
+                  WINDOW_WIDTH, WINDOW_HEIGHT,
+                  bgfx::TextureFormat::RGBA8,
+                  (samplerFlags|BGFX_TEXTURE_RT_MSAA_X16));
+
+    if(!bgfx::isValid(fbhUI)) {
+        LOG("ERROR> could not create UI frame buffer");
+        return false;
+    }
+
     // Set view 0 clear state.
-    bgfx::setViewClear(0, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, 0x303030ff, 1.0f, 0);
+    bgfx::setViewClear(RdrViewID::GAME, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, 0x101010ff, 1.0f, 0.f);
+    bgfx::setViewClear(RdrViewID::UI, BGFX_CLEAR_COLOR, 0x00000000, 1.f, 0.f);
+    bgfx::setViewClear(RdrViewID::COMBINE, BGFX_CLEAR_COLOR, 0x101010ff, 1.0f, 0.f);
+
+    bgfx::setViewFrameBuffer(RdrViewID::GAME, fbhGame);
+    bgfx::setViewFrameBuffer(RdrViewID::UI, fbhUI);
 
     imguiCreate();
 
     // Create vertex stream declaration.
     PosColorVertex::init();
+    PosUvVertex::init();
 
     // Create static vertex buffer.
     cubeVbh = bgfx::createVertexBuffer(
@@ -321,13 +425,22 @@ bool init()
             PosColorVertex::ms_decl
             );
 
+    vbhScreenQuad = bgfx::createVertexBuffer(
+                        bgfx::makeRef(s_screenQuadVertData, sizeof(s_screenQuadVertData)),
+                        PosUvVertex::decl
+                        );
+
     u_color = bgfx::createUniform("u_color", bgfx::UniformType::Vec4);
+    u_sdiffuse = bgfx::createUniform("u_sdiffuse", bgfx::UniformType::Int1); // sampler2D
+
     programTest = loadProgram(&g_fileReader, "vs_test", "fs_test");
     programVertShading = loadProgram(&g_fileReader, "vs_vertex_shading", "fs_vertex_shading");
     programVertShadingColor = loadProgram(&g_fileReader, "vs_vertex_shading", "fs_vertex_shading_color");
     programVertShadingColorInstance = loadProgram(&g_fileReader, "vs_vertex_shading_instance",
                                                   "fs_vertex_shading_instance");
     programDbgColor = loadProgram(&g_fileReader, "vs_dbg_color", "fs_dbg_color");
+    progGameFinal = loadProgram(&g_fileReader, "vs_game_final", "fs_game_final");
+    progUiFinal = loadProgram(&g_fileReader, "vs_game_final", "fs_ui_final");
 
     if(!dbgDrawInit()) {
         return false;
@@ -353,7 +466,11 @@ bool init()
             PosColorVertex::ms_decl
             );
 
-    if(!(playerShipMesh = meshLoad("assets/player_ship.mesh", &g_fileReader))) {
+    if(!(meshPlayerShip = meshLoad("assets/player_ship.mesh", &g_fileReader))) {
+        return false;
+    }
+
+    if(!(meshEyeEn1 = meshLoad("assets/eye_enemy1.mesh", &g_fileReader))) {
         return false;
     }
 
@@ -372,13 +489,14 @@ void initGame()
 
     PhysBody body = {};
     Collider colPlayer;
-    colPlayer.makeCb(CircleBound{ vec2{0, 0}, 2.0f });
+    colPlayer.makeCb(CircleBound{ vec2{0, 0}, 1.5f });
     body.pos = vec2{ 10, 10 };
     body.weight = 1.0;
     body.bounceStrength = 0.0;
     playerBody = room.physWorld.addDynamicBody(colPlayer, body);
     playerShip.body = playerBody;
 
+    /*
     Collider col;
     OrientedBoundingBox obb;
     obb.origin = vec2{10, 10};
@@ -399,6 +517,7 @@ void initGame()
         ball.bounceStrength = 1.0;
         room.physWorld.addDynamicBody(col.makeCb(cb), ball);
     }
+    */
 }
 
 void cleanUp()
@@ -407,16 +526,27 @@ void cleanUp()
 
     dbgDrawDeinit();
 
-    meshUnload(playerShipMesh);
+    meshUnload(meshPlayerShip);
+    meshUnload(meshEyeEn1);
+
     bgfx::destroy(originVbh);
     bgfx::destroy(gridVbh);
     bgfx::destroy(cubeVbh);
+    bgfx::destroy(vbhScreenQuad);
+
     bgfx::destroy(programTest);
     bgfx::destroy(programVertShading);
     bgfx::destroy(programVertShadingColor);
     bgfx::destroy(programVertShadingColorInstance);
     bgfx::destroy(programDbgColor);
+    bgfx::destroy(progGameFinal);
+    bgfx::destroy(progUiFinal);
+
     bgfx::destroy(u_color);
+    bgfx::destroy(u_sdiffuse);
+
+    bgfx::destroy(fbhGame);
+    bgfx::destroy(fbhUI);
 
     bgfx::shutdown();
 }
@@ -438,7 +568,16 @@ i32 run()
         f64 delta = f64(frameTime/freq);
 
         update(delta);
+
+        if(showUI) {
+            imguiEndFrame();
+        }
+
         render();
+
+        // Advance to next frame. Rendering thread will be kicked to
+        // process submitted rendering primitives.
+        bgfx::frame();
     }
 
     cleanUp();
@@ -488,6 +627,10 @@ void handleEvent(const SDL_Event& event)
             dbgEnableWorldOrigin ^= 1;
             return;
         }
+        if(event.key.keysym.sym == SDLK_p) {
+            dbgEnableDbgPhysics ^= 1;
+            return;
+        }
     }
 }
 
@@ -510,7 +653,7 @@ void updateUI(f64 delta)
         return;
     }
 
-    imguiBeginFrame(mx, my, buttons, WINDOW_WIDTH, WINDOW_HEIGHT);
+    imguiBeginFrame(mx, my, buttons, WINDOW_WIDTH, WINDOW_HEIGHT, 0xff, RdrViewID::UI);
 
     // ui code here
     im::ShowDemoWindow();
@@ -522,6 +665,7 @@ void updateUI(f64 delta)
     im::InputFloat("Player camera height", &dbgPlayerCamHeight, 1.0f, 10.0f);
     im::Checkbox("Enable grid", &dbgEnableGrid);
     im::Checkbox("Enable world origin", &dbgEnableWorldOrigin);
+    im::Checkbox("Enable debug physics", &dbgEnableDbgPhysics);
     im::Checkbox("Enable debug draw", &dbgEnableDbgDraw);
 
     im::End();
@@ -551,14 +695,11 @@ void update(f64 delta)
         physWorldTimeAcc = 0;
     }
 
-    /*if(delta > PHYS_UPDATE_DELTA) {
-        delta = PHYS_UPDATE_DELTA;
+    if(dbgEnableWorldOrigin) {
+        dbgDrawLine({0, 0, 0}, {10, 0, 0}, vec4{0, 0, 1, 1}, 0.1f);
+        dbgDrawLine({0, 0, 0}, {0, 10, 0}, vec4{0, 1, 0, 1}, 0.1f);
+        dbgDrawLine({0, 0, 0}, {0, 0, 10}, vec4{1, 0, 0, 1}, 0.1f);
     }
-    room.physWorld.update(delta, 10);*/
-
-    dbgDrawLine({0, 0, 0}, {10, 0, 0}, vec4{0, 0, 1, 1}, 0.1f);
-    dbgDrawLine({0, 0, 0}, {0, 10, 0}, vec4{0, 1, 0, 1}, 0.1f);
-    dbgDrawLine({0, 0, 0}, {0, 0, 10}, vec4{1, 0, 0, 1}, 0.1f);
 
     playerShip.update(delta, physWorldTimeAcc / PHYS_UPDATE_DELTA);
     playerShip.computeModelMatrix();
@@ -575,11 +716,10 @@ void update(f64 delta)
         bx::mtxLookAtRh(camView, cam.pos, at, up);
     }
     else if(cameraId == CameraID::PLAYER_VIEW) {
-        vec3 dir = vec3{0, 0.001f, -1.f};
-        bx::vec3Norm(dir, dir);
-        vec3 eye = playerShip.tf.pos + vec3{0, 0, dbgPlayerCamHeight};
-        vec3 at = eye + dir;
-        bx::mtxLookAtRh(camView, eye, at, up);
+        CameraBirdView camBv;
+        camBv.pos = playerShip.tf.pos;
+        camBv.height = dbgPlayerCamHeight;
+        camBv.compute(&camView);
 
         mat4 invView;
         mat4 viewProj;
@@ -591,22 +731,18 @@ void update(f64 delta)
 
     f32 time = (f32)((bx::getHPCounter()-timeOffset)/f64(bx::getHPFrequency()));
 
-    room.dbgDraw();
-
-    vec2 v = vec2Rotate({5, 10 }, time);
-    dbgDrawLine({0, 0, 0}, vec2ToVec3(v), vec4{1, 1, 1, 1});
-
-    if(showUI) {
-        imguiEndFrame();
+    if(dbgEnableDbgPhysics) {
+        room.dbgDrawPhysWorld();
     }
 }
 
 void render()
 {
-    bgfx::setViewTransform(0, camView, proj);
+    bgfx::setViewRect(RdrViewID::GAME, 0, 0, u16(WINDOW_WIDTH), u16(WINDOW_HEIGHT));
+    bgfx::setViewRect(RdrViewID::UI, 0, 0, u16(WINDOW_WIDTH), u16(WINDOW_HEIGHT));
+    bgfx::setViewRect(RdrViewID::COMBINE, 0, 0, u16(WINDOW_WIDTH), u16(WINDOW_HEIGHT));
 
-    // Set view 0 default viewport.
-    bgfx::setViewRect(0, 0, 0, u16(WINDOW_WIDTH), u16(WINDOW_HEIGHT));
+    bgfx::setViewTransform(RdrViewID::GAME, camView, proj);
 
     // This dummy draw call is here to make sure that view 0 is cleared
     // if no other draw calls are submitted to view 0.
@@ -624,7 +760,7 @@ void render()
         const f32 transparent[] = {0, 0, 0, 0};
         bgfx::setUniform(u_color, transparent);
         bgfx::setVertexBuffer(0, originVbh, 0, BX_COUNTOF(s_originVertData));
-        bgfx::submit(0, programDbgColor);
+        bgfx::submit(RdrViewID::GAME, programDbgColor);
     }
 
     // XY grid
@@ -643,17 +779,17 @@ void render()
         const f32 white[] = {0.5, 0.5, 0.5, 1};
         bgfx::setUniform(u_color, white);
         bgfx::setVertexBuffer(0, gridVbh, 0, BX_COUNTOF(s_gridLinesVertData));
-        bgfx::submit(0, programDbgColor);
+        bgfx::submit(RdrViewID::GAME, programDbgColor);
     }
 
     f32 time = (f32)((bx::getHPCounter()-timeOffset)/f64(bx::getHPFrequency()));
 
     // debug room
-#if 0
+#if 1
     mat4 mtxRoom;
-    roomTest.tfRoom.toMtx(&mtxRoom);
+    room.tfRoom.toMtx(&mtxRoom);
 
-    const i32 cubeCount = roomTest.cubeTransforms.size();
+    const i32 cubeCount = room.cubeTransforms.size();
     // 80 bytes stride = 64 bytes for 4x4 matrix + 16 bytes for RGBA color.
     const uint16_t instanceStride = 80;
     const uint32_t numInstances   = cubeCount;
@@ -665,7 +801,7 @@ void render()
         u8* data = idb.data;
 
         for(u32 i = 0; i < cubeCount; ++i) {
-            Transform tf = roomTest.cubeTransforms[i];
+            Transform tf = room.cubeTransforms[i];
             mat4 mtx1;
             f32* mtxModel = (f32*)data;
 
@@ -694,7 +830,7 @@ void render()
             | BGFX_STATE_MSAA
             );
 
-        bgfx::submit(0, programVertShadingColorInstance);
+        bgfx::submit(RdrViewID::GAME, programVertShadingColorInstance);
     }
 #endif
 
@@ -702,7 +838,8 @@ void render()
     const f32 color[] = {1, 0, 0, 1};
     bgfx::setUniform(u_color, color);
 
-    meshSubmit(playerShipMesh, 0, programVertShadingColor, playerShip.mtxModel, BGFX_STATE_MASK);
+    meshSubmit(meshPlayerShip, RdrViewID::GAME, programVertShadingColor,
+               playerShip.mtxModel, BGFX_STATE_MASK);
 
     // mouse cursor
     if(cameraId == CameraID::PLAYER_VIEW) {
@@ -724,16 +861,59 @@ void render()
 
         bgfx::setTransform(mtxCursor);
         bgfx::setVertexBuffer(0, cubeVbh, 0, BX_COUNTOF(s_cubeRainbowVertData));
-        bgfx::submit(0, programDbgColor);
+        bgfx::submit(RdrViewID::GAME, programDbgColor);
     }
+
+    // test enemy
+    Transform tfEyeEn;
+    tfEyeEn.pos = {20, 20, 0};
+    tfEyeEn.scale = {2, 2, 2};
+
+    quat baseRot;
+    bx::quatRotateX(baseRot, -bx::kPiHalf);
+    quat rotZ;
+    bx::quatRotateZ(rotZ, -bx::kPiHalf);
+    bx::quatMul(baseRot, baseRot, rotZ);
+
+    bx::quatRotateZ(rotZ, time * 0.2);
+    bx::quatMul(tfEyeEn.rot, baseRot, rotZ);
+
+    mat4 mtxModelEyeEn;
+    tfEyeEn.toMtx(&mtxModelEyeEn);
+
+    const f32 eyeColor[] = {0.5f + (sinf(time) + 1.0f) * 0.5f, 0, 0.f, 1};
+    const f32 bodyColor[] = {0.2f, 0, 1.0f, 1};
+
+    bgfx::setUniform(u_color, eyeColor);
+    meshSubmitGroup(meshEyeEn1, 0, RdrViewID::GAME, programVertShadingColor,
+                    mtxModelEyeEn, BGFX_STATE_MASK);
+
+    bgfx::setUniform(u_color, bodyColor);
+    meshSubmitGroup(meshEyeEn1, 1, RdrViewID::GAME, programVertShadingColor,
+                    mtxModelEyeEn, BGFX_STATE_MASK);
 
     if(dbgEnableDbgDraw) {
         dbgDrawRender();
     }
 
-    // Advance to next frame. Rendering thread will be kicked to
-    // process submitted rendering primitives.
-    bgfx::frame();
+    bgfx::setState(0
+        | BGFX_STATE_WRITE_RGB
+        );
+
+    bgfx::setVertexBuffer(0, vbhScreenQuad, 0, 6);
+
+    bgfx::setTexture(0, u_sdiffuse, bgfx::getTexture(fbhGame, 0));
+    bgfx::submit(RdrViewID::COMBINE, progGameFinal);
+
+    bgfx::setState(0
+        | BGFX_STATE_WRITE_RGB
+        | BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_INV_SRC_ALPHA)
+        );
+
+    bgfx::setVertexBuffer(0, vbhScreenQuad, 0, 6);
+
+    bgfx::setTexture(0, u_sdiffuse, bgfx::getTexture(fbhUI, 0));
+    bgfx::submit(RdrViewID::COMBINE, progUiFinal);
 }
 
 };

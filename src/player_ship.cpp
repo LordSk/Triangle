@@ -56,25 +56,55 @@ void PlayerShip::handleEvent(const SDL_Event& event)
 void PlayerShip::update(f64 delta, f64 physWorldAlpha)
 {
     assert(body);
-    f64 speed = 20;
+    vec2 pos2 = vec2Lerp(body->prevPos, body->pos, physWorldAlpha);
+    vec2 mouseDir = vec2Norm(vec2{ mousePosWorld.x - pos2.x, mousePosWorld.y - pos2.y });
+    angle = bx::atan2(-mouseDir.y, mouseDir.x);
+
     vec2 dir;
     dir.x = (input.right - input.left);
     dir.y = (input.up - input.down);
 
+//#define ADVANCED_MOVEMENT
+#ifdef ADVANCED_MOVEMENT
+    f32 accel = 100.0f;
+
     if(vec2Len(dir) > 0) {
         dir = vec2Norm(dir);
-        body->vel = dir * speed;
+        accel += 200.0f * clamp(vec2Dot(mouseDir, dir), -0.2f, 1.0f);
+        body->vel += dir * accel * delta;
     }
     else {
         // apply friction
         body->vel = body->vel * (1.0 - bx::clamp(20.0 * delta, 0.0, 1.0));
     }
 
-    vec2 pos2 = vec2Lerp(body->prevPos, body->pos, physWorldAlpha);
+    const f32 maxSpeed = 30.0f + 20.0f * clamp(vec2Dot(mouseDir, dir), 0.0f, 1.0f);
+    if(vec2Len(body->vel) > maxSpeed) {
+        body->vel = vec2Norm(body->vel) * maxSpeed;
+
+#else
+    f32 accel = 300.0f;
+    f32 deccel = 15.0f;
+
+    if(vec2Len(dir) > 0) {
+        dir = vec2Norm(dir);
+        body->vel += dir * accel * delta;
+    }
+    else {
+        // apply friction
+        body->vel = body->vel * (1.0 - bx::clamp(deccel * delta, 0.0, 1.0));
+    }
+
+    const f32 maxSpeed = 40.0f;
+    if(vec2Len(body->vel) > maxSpeed) {
+        body->vel = vec2Norm(body->vel) * maxSpeed;
+    }
+#endif
+
+
     tf.pos.x = pos2.x;
     tf.pos.y = pos2.y;
 
-    angle = bx::atan2(-(mousePosWorld.y - tf.pos.y), mousePosWorld.x - tf.pos.x);
     bx::quatRotateZ(tf.rot, angle);
     bx::quatMul(tf.rot, baseRot, tf.rot);
 }
