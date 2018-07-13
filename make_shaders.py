@@ -2,7 +2,7 @@ from os import listdir
 from os.path import isfile, join
 from subprocess import call
 
-path = "src"
+path = "src/shaders"
 
 onlyfiles = [f for f in listdir(path) if isfile(join(path, f))]
 scList = []
@@ -21,6 +21,6 @@ for f in scList:
         type = "fragment"
         typeMini = "ps"
         
-    cmd = 'ignore/shaderc.exe -f "src/%s.sc" -o "build/%s.dx11" --type %s --platform windows -varyingdef "src/varying.def.sc" -p %s_5_0 --debug --O 0' % (name, name, type, typeMini);
+    cmd = ('ignore/shaderc.exe -f "' + path + '/%s.sc" -o "build/%s.dx11" --type %s --platform windows -varyingdef "' + path + '/varying.def.sc" -p %s_5_0 --debug --O 0') % (name, name, type, typeMini);
     call(cmd)
     
