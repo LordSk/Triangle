@@ -6,6 +6,7 @@
 #include <SDL2/SDL_syswm.h>
 
 #include "base.h"
+#include <time.h>
 #include <bgfx/platform.h>
 #include <bx/math.h>
 #include <bx/file.h>
@@ -52,6 +53,8 @@ f32 dbgScale = 1;
 
 bool init()
 {
+    randSetSeed(time(0));
+
     SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "0");
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
@@ -149,8 +152,6 @@ i32 run()
 
         render();
 
-        // Advance to next frame. Rendering thread will be kicked to
-        // process submitted rendering primitives.
         renderer.frame();
     }
 

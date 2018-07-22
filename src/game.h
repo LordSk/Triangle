@@ -8,19 +8,6 @@
 #include "mesh_load.h"
 #include <SDL2/SDL_events.h>
 
-struct Room
-{
-    Transform tfRoom;
-    vec3 size;
-    Array<Transform> cubeTransforms;
-    Array<mat4> cubeTfMtx;
-    PhysWorld physWorld;
-
-    void make(vec3 size_, const i32 cubeSize);
-
-    void dbgDrawPhysWorld();
-};
-
 struct CameraID {
     enum Enum {
         FREE_VIEW = 0,
@@ -35,7 +22,7 @@ struct CameraBirdView
     vec3 up = {0, 0, 1.f};
     f32 height;
 
-    void compute(mat4* lookAt) {
+    inline void compute(mat4* lookAt) {
         bx::vec3Norm(dir, dir);
         vec3 eye = pos + vec3{0, 0, height};
         vec3 at = eye + dir;
@@ -63,53 +50,9 @@ struct CameraFreeFlight
     f64 pitch = 0;
     f64 yaw = 0;
 
-    void handleEvent(const SDL_Event& event) {
-        if(event.type == SDL_KEYDOWN && event.key.repeat == 0) {
-            switch(event.key.keysym.sym) {
-                case SDLK_z: input.forward = true; break;
-                case SDLK_s: input.backward = true; break;
-                case SDLK_q: input.left = true; break;
-                case SDLK_d: input.right = true; break;
-                case SDLK_a: input.up = true; break;
-                case SDLK_e: input.down = true; break;
-            }
-            return;
-        }
-        if(event.type == SDL_KEYUP) {
-            switch(event.key.keysym.sym) {
-                case SDLK_z: input.forward = false; break;
-                case SDLK_s: input.backward = false; break;
-                case SDLK_q: input.left = false; break;
-                case SDLK_d: input.right = false; break;
-                case SDLK_a: input.up = false; break;
-                case SDLK_e: input.down = false; break;
-            }
-            return;
-        }
+    void handleEvent(const SDL_Event& event);
 
-        if(event.type == SDL_MOUSEMOTION) {
-            // TODO: move this to applyInput
-            yaw = 0;
-            pitch = 0;
-            yaw += event.motion.xrel / (bx::kPi2 * 100.0);
-            pitch += event.motion.yrel / (bx::kPi2 * 100.0);
-
-            vec3 right;
-            bx::vec3Cross(right, dir, up);
-            quat qyaw;
-            quat qpitch;
-            bx::quatRotateAxis(qyaw, up, yaw);
-            bx::quatRotateAxis(qpitch, right, pitch);
-            bx::quatMul(rot, qyaw, qpitch);
-            bx::quatNorm(rot, rot);
-            //dir = {1, 0, 0};
-            bx::vec3MulQuat(dir, dir, rot);
-            bx::vec3Norm(dir, dir);
-            return;
-        }
-    }
-
-    void applyInput(f64 delta) {
+    inline void applyInput(f64 delta) {
         vec3 right;
         bx::vec3Cross(right, dir, up);
         bx::vec3Norm(right, right);
@@ -120,16 +63,31 @@ struct CameraFreeFlight
     }
 };
 
+struct Room
+{
+    Transform tfRoom;
+    vec3 size;
+    Array<Transform> cubeTransforms;
+    Array<mat4> cubeTfMtx;
+    PhysWorld physWorld;
+
+    void make(vec3 size_, const i32 cubeSize);
+
+    void dbgDrawPhysWorld();
+};
+
+struct Enemy1
+{
+    Transform* tf;
+    PhysBody* body;
+    vec2 target;
+    f32 dir;
+    f32 changeRightDirCd;
+    f32 changeFwdDirCd;
+};
 
 struct GameData
 {
-    MeshHandle meshPlayerShip;
-    MeshHandle meshEyeEn1;
-
-    Room room;
-    PlayerShip playerShip;
-    PhysBody* playerBody;
-
     f64 time = 0;
     f64 physWorldTimeAcc = 0;
     i32 cameraId = CameraID::PLAYER_VIEW;
@@ -138,6 +96,14 @@ struct GameData
     CameraFreeFlight camFree;
 
     f32 dbgPlayerCamHeight = 30;
+
+    MeshHandle meshPlayerShip;
+    MeshHandle meshEyeEn1;
+
+    Room room;
+    PlayerShip playerShip;
+    Enemy1 enemy1List[10];
+    Transform enemy1TfList[10];
 
     bool init();
     void deinit();

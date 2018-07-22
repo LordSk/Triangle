@@ -79,3 +79,13 @@ f64 rand1h()
 {
     return rand01() * 2.0 - 1.0;
 }
+
+f64 randRange(f64 min, f64 max)
+{
+    return min + rand01() * (max - min);
+}
+
+void randSetSeed(u32 seed)
+{
+    state32 = seed;
+}

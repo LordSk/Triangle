@@ -315,6 +315,8 @@ void Renderer::frame()
     bgfx::setTexture(0, u_sdiffuse, bgfx::getTexture(fbhUI, 0));
     bgfx::submit(RdrViewID::COMBINE, progUiFinal);
 
+    // Advance to next frame. Rendering thread will be kicked to
+    // process submitted rendering primitives.
     bgfx::frame();
 }
 

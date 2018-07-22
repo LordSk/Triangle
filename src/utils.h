@@ -122,4 +122,6 @@ bgfx::ProgramHandle loadProgram(bx::FileReaderI* _reader, const char* _vsName, c
 u32 xorshift32();
 f64 rand01();
 f64 rand1h();
+f64 randRange(f64 min, f64 max);
+void randSetSeed(u32 seed);
 
