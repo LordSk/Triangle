@@ -283,31 +283,39 @@ bool GameData::init()
     playerShip.dmgBody->collider = colPlayer;
     playerShip.dmgBody->team = DamageWorld::PLAYER;
 
-    // init enemy1 s
-    const i32 en1Count = arr_count(enemy1List);
-    for(i32 i = 0; i < en1Count; ++i) {
-        Enemy1& en1 = enemy1List[i];
-        assert(compTransformCount < arr_count(compTransform));
-        assert(compDmgBodyCount < arr_count(compDmgBody));
+    for(i32 i = 0; i < 150; ++i) {
+        const i32 eid = ecs.createEntity();
+        CTransform& tf = ecs.addCompTransform(eid);
+        CPhysBody& physBody = ecs.addCompPhysBody(eid);
+        CDmgBody& dmgBody = ecs.addCompDmgBody(eid);
+        CAiBasicEnemy& ai = ecs.addAiBasicEnemy(eid);
+        DrawMesh& mesh = ecs.addDrawMesh(eid);
 
-        en1.tf = &compTransform[compTransformCount++];
-        en1.dmgBody = &compDmgBody[compDmgBodyCount++];
-        en1.tf->pos = vec3{ (f32)randRange(10, room.size.x-10), (f32)randRange(10, room.size.y-10), 0 };
-        en1.tf->scale = vec3Splat(1.5);
+        tf.pos = vec3{ (f32)randRange(10, room.size.x-10), (f32)randRange(10, room.size.y-10), 0 };
+        tf.scale = vec3Splat(1.5);
 
-        PhysBody body = {};
+        PhysBody body{};
         Collider collider;
         collider.makeCb(CircleBound{ vec2{0, 0}, 1.5f });
-        body.pos = vec3ToVec2(en1.tf->pos);
+        body.pos = vec3ToVec2(tf.pos);
         body.weight = 1.0;
         body.bounceStrength = 0.0;
-        en1.physBody = room.physWorld.addDynamicBody(collider, body);
+        physBody.body = room.physWorld.addDynamicBody(collider, body);
 
-        en1.dmgBody->collider = collider;
-        en1.dmgBody->team = DamageWorld::ENEMY;
+        dmgBody.collider = collider;
+        dmgBody.team = DamageWorld::ENEMY;
 
-        en1.changeRightDirCd = 0.0;
-        en1.changeFwdDirCd = 0.0;
+        ai.changeRightDirCd = 0.0;
+        ai.changeFwdDirCd = 0.0;
+
+        mesh.color = {0.5f, 0.0f, 1.0f, 1.0f};
+        mesh.hMesh = meshEyeEn1;
+
+        quat baseRot;
+        bx::quatRotateX(baseRot, -bx::kPiHalf);
+        quat rotZ;
+        bx::quatRotateZ(rotZ, -bx::kPiHalf);
+        bx::quatMul(mesh.tf.rot, baseRot, rotZ);
     }
 
     return true;
@@ -388,41 +396,7 @@ void GameData::update(f64 delta)
 
     rdr.setView(mtxProj, mtxView);
 
-    // update enemy1
-    const i32 en1Count = arr_count(enemy1List);
-    for(i32 i = 0; i < en1Count; ++i) {
-        Enemy1& en1 = enemy1List[i];
-        const vec2 pos2 = vec2Lerp(en1.physBody->prevPos, en1.physBody->pos, physLerpAlpha);
-        en1.tf->pos = vec2ToVec3(pos2);
-        en1.target = vec3ToVec2(playerShip.tf->pos);
-        const vec2 diff = en1.target - pos2;
-
-        en1.changeRightDirCd -= delta;
-        en1.changeFwdDirCd -= delta;
-
-        if(en1.changeRightDirCd <= 0.0) {
-            en1.changeRightDirCd = randRange(1.0f, 2.0f);
-            vec2 right = vec2Norm(vec2Rotate(diff, bx::kPiHalf));
-            f32 rightDir = (xorshift32() & 1) * 2.0 - 1.0;
-            en1.physBody->vel = right * (rightDir * 5.0f) + vec2Norm(diff) * randRange(-5.0f, 5.0f);
-        }
-
-        if(en1.changeFwdDirCd <= 0.0) {
-            en1.changeFwdDirCd = randRange(0.5f, 1.0f);
-
-            const f32 dist = vec2Len(diff);
-            f32 fwdDir = 1.0f;
-            if(dist < 25) {
-                fwdDir = (xorshift32() & 1) * 2.0 - 1.0;
-            }
-            if(dist < 10) {
-                fwdDir = -1.0f;
-            }
-            en1.physBody->vel += vec2Norm(diff) * (fwdDir * 5.0f);
-        }
-
-        en1.dmgBody->collider.setPos(pos2);
-    }
+    ecs.update(delta, physLerpAlpha);
 
     static f64 fireCd = 0;
     fireCd -= delta;
@@ -454,13 +428,9 @@ void GameData::update(f64 delta)
 
     dmgWorld.registerZone(DamageWorld::PLAYER, playerShip.dmgBody->collider, {});
 
-    for(i32 i = 0; i < en1Count; ++i) {
-        Enemy1& en1 = enemy1List[i];
-        dmgWorld.registerZone(DamageWorld::ENEMY, en1.dmgBody->collider, {});
-    }
-    for(i32 i = 0; i < weapBulletCount2; i++) {
-        WeaponBullet& wb = weapBulletList[i];
-        dmgWorld.registerZone(DamageWorld::ENEMY, wb.dmgBody->collider, {});
+    for(i32 i = 0; i < ecs.comp_DmgBody.count(); ++i) {
+        const CDmgBody& dmgBody = ecs.comp_DmgBody.data()[i];
+        dmgWorld.registerZone((DamageWorld::Team)dmgBody.team, dmgBody.collider, {});
     }
 
     dmgWorld.dbgDraw();
@@ -502,30 +472,6 @@ void GameData::render()
 
     rdr.drawCubeInstances(instData.data(), cubeCount);
 #endif
-
-    // draw enemy1
-    const i32 en1Count = arr_count(enemy1List);
-    for(i32 i = 0; i < en1Count; ++i) {
-        Transform tf = *enemy1List[i].tf;
-
-        quat baseRot;
-        bx::quatRotateX(baseRot, -bx::kPiHalf);
-        quat rotZ;
-        bx::quatRotateZ(rotZ, -bx::kPiHalf);
-        bx::quatMul(baseRot, baseRot, rotZ);
-
-        const vec2 diff = enemy1List[i].target - vec3ToVec2(tf.pos);
-        const f32 angle = atan2(-diff.y, diff.x);
-        bx::quatRotateZ(rotZ, angle);
-        bx::quatMul(tf.rot, baseRot, rotZ);
-
-        mat4 mtxModelEyeEn;
-        tf.toMtx(&mtxModelEyeEn);
-
-        const vec4 bodyColor = {0.2f, 0, 1.0f, 1};
-        rdr.drawMesh(meshEyeEn1, mtxModelEyeEn, bodyColor);
-    }
-
 
     //player ship
     mat4 mtxModel;

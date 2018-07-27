@@ -115,6 +115,98 @@ struct List
     }
 };
 
+template<typename T>
+struct ArraySparse
+{
+    Array<T> _data;
+    Array<i32> _dataEltId;
+    Array<i32> _eltDataId;
+
+    ArraySparse() {
+        _data.reserve(64);
+        _dataEltId.reserve(64);
+
+        _eltDataId.resize(64);
+        const i32 eltDataIdCount = _eltDataId.count();
+        for(i32 i = 0; i < eltDataIdCount; i++) {
+            _eltDataId[i] = -1;
+        }
+    }
+
+    inline void _doubleIdListSize() {
+        const i32 oldCount = _eltDataId.count();
+        _eltDataId.resize(_eltDataId.count() * 2);
+        const i32 newCount = _eltDataId.count();
+        for(i32 i = oldCount; i < newCount; i++) {
+            _eltDataId[i] = -1;
+        }
+    }
+
+    inline i32 findFirstFreeId() const {
+        const i32 eltDataIdCount = _eltDataId.count();
+        for(i32 i = 0; i < eltDataIdCount; i++) {
+            if(_eltDataId[i] == -1) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    inline T& push(T elem) {
+        i32 id = findFirstFreeId();
+        if(id == -1) { // resize eltDataId array
+            id = _eltDataId.count();
+            _doubleIdListSize();
+        }
+        return emplace(id, elem);
+    }
+
+    inline T& emplace(const i32 id, T elem) {
+        if(id >= _eltDataId.count()) {
+            _doubleIdListSize();
+            assert(id < _eltDataId.count());
+        }
+        if(_eltDataId[id] == -1) {
+            _eltDataId[id] = _data.count();
+            _dataEltId.push(id);
+            return _data.push(elem);
+        }
+        return (_data[_eltDataId[id]] = elem);
+    }
+
+    inline void removeById(const i32 id) {
+        assert(id < _eltDataId.count());
+        if(_eltDataId[id] == -1) return;
+        const i32 dataId = _eltDataId[id];
+        const i32 swapEltId = _dataEltId.last();
+        _eltDataId[swapEltId] = dataId;
+        _dataEltId[dataId] = swapEltId;
+        swap(&_data[dataId], &_data.last());
+        _data.pop();
+        _dataEltId.pop();
+        _eltDataId[id] = -1;
+    }
+
+    inline void removeByElt(const T& elt) {
+        assert(&elt >= _data.data() && &elt <= &_data.last());
+        removeById(&elt - _data.data());
+    }
+
+    inline i32 count() const {
+        return _data.count();
+    }
+
+    inline T* data() {
+        return _data.data();
+    }
+
+    inline T& operator[](const i32 id) {
+        assert(id < _eltDataId.count());
+        assert(_eltDataId[id] != -1);
+        return _data[_eltDataId[id]];
+    }
+};
+
 const bgfx::Memory* loadMem(bx::FileReaderI* _reader, const char* _filePath);
 bgfx::ShaderHandle loadShader(bx::FileReaderI* _reader, const char* _name);
 bgfx::ProgramHandle loadProgram(bx::FileReaderI* _reader, const char* _vsName, const char* _fsName);

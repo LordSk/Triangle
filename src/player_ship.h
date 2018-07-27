@@ -7,7 +7,7 @@
 struct PlayerShip
 {
     CTransform* tf;
-    CPhysBody* physBody;
+    PhysBody* physBody;
     CDmgBody* dmgBody;
     quat baseRot;
 

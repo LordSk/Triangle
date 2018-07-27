@@ -53,8 +53,6 @@ f32 dbgScale = 1;
 
 bool init()
 {
-    randSetSeed(time(0));
-
     SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "0");
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
@@ -275,6 +273,37 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 int main()
 #endif
 {
+    randSetSeed(time(0));
+
+#if 0
+    ArraySparse<u32> testSparse;
+    for(i32 i = 0; i < 100; i++) {
+        testSparse.push((u32)i);
+    }
+
+    for(i32 i = 0; i < testSparse.count(); i++) {
+        LOG("[%d] = %d", i, testSparse[i]);
+    }
+
+    LOG("count before remove = %d", testSparse.count());
+
+    for(i32 i = 0; i < 100; i++) {
+        testSparse.removeById(xorshift32() % 100);
+    }
+
+    LOG("count after remove = %d", testSparse.count());
+
+    for(i32 i = 0; i < 100; i++) {
+        testSparse.emplace(i, (u32)i);
+    }
+
+    for(i32 i = 0; i < testSparse.count(); i++) {
+        LOG("[%d] = %d", i, testSparse[i]);
+    }
+
+    return 0;
+#endif
+
     SDL_SetMainReady();
 
     i32 sdl = SDL_Init(SDL_INIT_VIDEO|SDL_INIT_TIMER|SDL_INIT_EVENTS);

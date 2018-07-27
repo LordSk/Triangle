@@ -7,7 +7,7 @@
 #include "collision.h"
 #include "player_ship.h"
 #include "mesh_load.h"
-#include "basic_components.h"
+#include "ecs.h"
 
 struct DamageWorld
 {
@@ -111,17 +111,6 @@ struct Room
     void dbgDrawPhysWorld();
 };
 
-struct Enemy1
-{
-    CTransform* tf;
-    CPhysBody* physBody;
-    CDmgBody* dmgBody;
-    vec2 target;
-    f32 dir;
-    f32 changeRightDirCd;
-    f32 changeFwdDirCd;
-};
-
 struct GameData
 {
     f64 time = 0;
@@ -136,10 +125,11 @@ struct GameData
     MeshHandle meshPlayerShip;
     MeshHandle meshEyeEn1;
 
+    EntityComponentSystem ecs;
+
     Room room;
     DamageWorld dmgWorld;
     PlayerShip playerShip;
-    Enemy1 enemy1List[10];
     WeaponBullet weapBulletList[100];
     i32 weapBulletCount = 0;
 
