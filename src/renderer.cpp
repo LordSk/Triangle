@@ -131,12 +131,14 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
                     | BGFX_TEXTURE_V_CLAMP
                     ;
 
+    // TODO: fix depth buffer multisampling
+    // https://github.com/bkaradzic/bgfx/issues/1353
     bgfx::TextureHandle fbTexGame[2];
     fbTexGame[0] = bgfx::createTexture2D(u16(renderWidth), u16(renderHeight), false,
                                          1, bgfx::TextureFormat::BGRA8,
-                                         samplerFlags|BGFX_TEXTURE_SRGB|BGFX_TEXTURE_RT_MSAA_X16);
+                                         samplerFlags|BGFX_TEXTURE_SRGB/*|BGFX_TEXTURE_RT_MSAA_X16*/);
     fbTexGame[1] = bgfx::createTexture2D(u16(renderWidth), u16(renderHeight), false,
-                                         1, bgfx::TextureFormat::D24, samplerFlags|BGFX_TEXTURE_RT_MSAA_X16);
+                                         1, bgfx::TextureFormat::D24, samplerFlags/*|BGFX_TEXTURE_RT_MSAA_X16*/);
     fbhGame = bgfx::createFrameBuffer(2, fbTexGame, true);
 
     if(!bgfx::isValid(fbhGame)) {

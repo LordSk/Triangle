@@ -340,7 +340,7 @@ void PhysWorld::update(f64 delta, const i32 stepCount)
                     assert(ceListCount < arr_count(ceList));
                     ceList[ceListCount++] = ce;
                     collidedWithStatic = true;
-                };
+                }
             }
 
             if(collidedWithStatic) {
@@ -367,7 +367,7 @@ void PhysWorld::update(f64 delta, const i32 stepCount)
                     collided[db] = true;
                     collided[db2] = true;
                     break;
-                };
+                }
             }
         }
 

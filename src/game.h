@@ -1,12 +1,47 @@
 #pragma once
 
+#include <SDL2/SDL_events.h>
 #include "base.h"
 #include "utils.h"
 #include "vector_math.h"
 #include "collision.h"
 #include "player_ship.h"
 #include "mesh_load.h"
-#include <SDL2/SDL_events.h>
+#include "basic_components.h"
+
+struct DamageWorld
+{
+    struct ZoneInfo {
+        u32 zid;
+        u32 _cid; // do not set this variable
+        void* data;
+    };
+
+    struct IntersectInfo {
+        i32 team1;
+        i32 team2;
+        ZoneInfo zone1;
+        ZoneInfo zone2;
+    };
+
+    enum Team {
+        NEUTRAL=0,
+        PLAYER,
+        ENEMY,
+        _COUNT
+    };
+
+    // TODO: remove teams? accelerate search with a grid
+    Array<Collider> colliders[Team::_COUNT];
+    Array<ZoneInfo> zoneInfos[Team::_COUNT];
+
+    DamageWorld();
+    // done post physical world update
+    void registerZone(const Team team, Collider c, ZoneInfo zoneInfo);
+    void clearZones();
+    void resolveIntersections(Array<IntersectInfo>* intersectList);
+    void dbgDraw();
+};
 
 struct CameraID {
     enum Enum {
@@ -69,7 +104,7 @@ struct Room
     vec3 size;
     Array<Transform> cubeTransforms;
     Array<mat4> cubeTfMtx;
-    PhysWorld physWorld;
+    PhysWorld physWorld; // TODO: move this out
 
     void make(vec3 size_, const i32 cubeSize);
 
@@ -78,8 +113,9 @@ struct Room
 
 struct Enemy1
 {
-    Transform* tf;
-    PhysBody* body;
+    CTransform* tf;
+    CPhysBody* physBody;
+    CDmgBody* dmgBody;
     vec2 target;
     f32 dir;
     f32 changeRightDirCd;
@@ -101,9 +137,16 @@ struct GameData
     MeshHandle meshEyeEn1;
 
     Room room;
+    DamageWorld dmgWorld;
     PlayerShip playerShip;
     Enemy1 enemy1List[10];
-    Transform enemy1TfList[10];
+    WeaponBullet weapBulletList[100];
+    i32 weapBulletCount = 0;
+
+    CTransform compTransform[1000];
+    CDmgBody compDmgBody[1000];
+    i32 compTransformCount = 0;
+    i32 compDmgBodyCount = 0;
 
     bool init();
     void deinit();

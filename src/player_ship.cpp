@@ -1,10 +1,10 @@
+#include <bx/math.h>
 #include "player_ship.h"
 #include "collision.h"
-#include <bx/math.h>
 
-PlayerShip::PlayerShip()
+void PlayerShip::init()
 {
-    tf.scale = {0.5, 0.5, 0.5};
+    tf->scale = {0.5, 0.5, 0.5};
     mousePosScreen = {};
     mousePosWorld = {10, 0, 0};
     angle = 0;
@@ -13,12 +13,7 @@ PlayerShip::PlayerShip()
     quat rotZ;
     bx::quatRotateZ(rotZ, -bx::kPiHalf);
     bx::quatMul(baseRot, baseRot, rotZ);
-    tf.rot = baseRot;
-}
-
-void PlayerShip::computeModelMatrix()
-{
-    tf.toMtx(&mtxModel);
+    tf->rot = baseRot;
 }
 
 void PlayerShip::handleEvent(const SDL_Event& event)
@@ -51,12 +46,28 @@ void PlayerShip::handleEvent(const SDL_Event& event)
         mousePosScreen.y = clamp(mousePosScreen.y, -450.f, 450.f);
         return;
     }
+
+    if(event.type == SDL_MOUSEBUTTONDOWN) {
+        switch(event.button.button) {
+            case SDL_BUTTON_LEFT: input.fire = true; break;
+            case SDL_BUTTON_RIGHT: break;
+        }
+        return;
+    }
+
+    if(event.type == SDL_MOUSEBUTTONUP) {
+        switch(event.button.button) {
+            case SDL_BUTTON_LEFT: input.fire = false; break;
+            case SDL_BUTTON_RIGHT: break;
+        }
+        return;
+    }
 }
 
 void PlayerShip::update(f64 delta, f64 physWorldAlpha)
 {
-    assert(body);
-    vec2 pos2 = vec2Lerp(body->prevPos, body->pos, physWorldAlpha);
+    assert(physBody);
+    vec2 pos2 = vec2Lerp(physBody->prevPos, physBody->pos, physWorldAlpha);
     vec2 mouseDir = vec2Norm(vec2{ mousePosWorld.x - pos2.x, mousePosWorld.y - pos2.y });
     angle = bx::atan2(-mouseDir.y, mouseDir.x);
 
@@ -88,25 +99,25 @@ void PlayerShip::update(f64 delta, f64 physWorldAlpha)
 
     if(vec2Len(dir) > 0) {
         dir = vec2Norm(dir);
-        body->vel += dir * accel * delta;
+        physBody->vel += dir * accel * delta;
     }
     else {
         // apply friction
-        body->vel = body->vel * (1.0 - bx::clamp(deccel * delta, 0.0, 1.0));
+        physBody->vel = physBody->vel * (1.0 - bx::clamp(deccel * delta, 0.0, 1.0));
     }
 
     const f32 maxSpeed = 40.0f;
-    if(vec2Len(body->vel) > maxSpeed) {
-        body->vel = vec2Norm(body->vel) * maxSpeed;
+    if(vec2Len(physBody->vel) > maxSpeed) {
+        physBody->vel = vec2Norm(physBody->vel) * maxSpeed;
     }
 #endif
 
 
-    tf.pos.x = pos2.x;
-    tf.pos.y = pos2.y;
+    tf->pos.x = pos2.x;
+    tf->pos.y = pos2.y;
 
-    bx::quatRotateZ(tf.rot, angle);
-    bx::quatMul(tf.rot, baseRot, tf.rot);
+    bx::quatRotateZ(tf->rot, angle);
+    bx::quatMul(tf->rot, baseRot, tf->rot);
 }
 
 void PlayerShip::computeCursorPos(const mat4& invViewProj, f32 camHeight)
@@ -131,7 +142,7 @@ void PlayerShip::computeCursorPos(const mat4& invViewProj, f32 camHeight)
     vec3 camDir;
     bx::vec3Norm(camDir, worldDir);
 
-    vec3 eye = tf.pos + vec3{0, 0, camHeight};
+    vec3 eye = tf->pos + vec3{0, 0, camHeight};
     vec3 p0 = {0, 0, 0};
     vec3 pn = {0, 0, 1};
     planeLineIntersection(&mousePosWorld, eye, camDir, p0, pn);

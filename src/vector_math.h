@@ -260,4 +260,3 @@ struct Transform
         bx::mtxMul(*mtxModel, mtx1, mtxTrans);
     }
 };
-
