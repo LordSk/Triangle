@@ -267,13 +267,12 @@ void colliderDbgDraw(const Collider& col1, vec4 color)
 PhysWorld::PhysWorld()
 {
     colStatic.reserve(512);
-    colDynamic.reserve(512);
-    bodyDyn.reserve(512);
 }
 
 void PhysWorld::clear()
 {
     colStatic.clear();
+    colDynamic.clear();
     bodyDyn.clear();
 }
 
@@ -282,10 +281,16 @@ Collider* PhysWorld::addStaticCollider(Collider col)
     return &(colStatic.push(col));
 }
 
-PhysBody* PhysWorld::addDynamicBody(Collider col, PhysBody body)
+PhysBody* PhysWorld::addDynamicBody(Collider col, PhysBody body, i32* bid)
 {
     colDynamic.push(col);
-    return &(bodyDyn.push(body));
+    return &(bodyDyn.push(body, bid));
+}
+
+void PhysWorld::removeBodyById(i32 bid)
+{
+    colDynamic.removeById(bid);
+    bodyDyn.removeById(bid);
 }
 
 void PhysWorld::update(f64 delta, const i32 stepCount)

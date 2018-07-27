@@ -5,10 +5,10 @@
 void updatePhysBody(EntityComponentSystem* ecs, CPhysBody* eltList, const i32 count, i32* entityId, f64 delta, f64 physLerpAlpha)
 {
     for(i32 i = 0; i < count; i++) {
-        const PhysBody& body = *eltList[i].body;
+        const PhysBody& body = eltList[i].world->bodyDyn[eltList[i].bodyId];
         assert(ecs->entityCompBits[entityId[i]] & ComponentBit::Transform);
 
-        CTransform& tf = ecs->comp_Transform[entityId[i]];
+        CTransform& tf = ecs->getComp<CTransform>(entityId[i]);
         vec2 pos2 = vec2Lerp(body.prevPos, body.pos, physLerpAlpha);
         tf.pos.x = pos2.x;
         tf.pos.y = pos2.y;
@@ -21,7 +21,7 @@ void updateDmgBody(EntityComponentSystem* ecs, CDmgBody* eltList, const i32 coun
         CDmgBody& dmgBody = eltList[i];
         assert(ecs->entityCompBits[entityId[i]] & ComponentBit::Transform);
 
-        CTransform& tf = ecs->comp_Transform[entityId[i]];
+        CTransform& tf = ecs->getComp<CTransform>(entityId[i]);
         dmgBody.collider.setPos(vec3ToVec2(tf.pos));
     }
 }
@@ -35,7 +35,7 @@ void updateAiBasicEnemy(EntityComponentSystem* ecs, CAiBasicEnemy* eltList, cons
         assert(ecs->entityCompBits[entityId[i]] & ComponentBit::Transform);
         assert(ecs->entityCompBits[entityId[i]] & ComponentBit::PhysBody);
 
-        CTransform& tf = ecs->comp_Transform[entityId[i]];
+        CTransform& tf = ecs->getComp<CTransform>(entityId[i]);
         const vec2 pos2 = vec3ToVec2(tf.pos);
         const vec2 diff = target - pos2;
 
@@ -48,7 +48,8 @@ void updateAiBasicEnemy(EntityComponentSystem* ecs, CAiBasicEnemy* eltList, cons
 
         if(ai.changeRightDirCd <= 0.0) {
             ai.changeRightDirCd = randRange(1.0f, 2.0f);
-            PhysBody& physBody = *ecs->comp_PhysBody[entityId[i]].body;
+            CPhysBody& cpb = ecs->getComp<CPhysBody>(entityId[i]);
+            PhysBody& physBody = cpb.world->bodyDyn[cpb.bodyId];
 
             vec2 right = vec2Norm(vec2Rotate(diff, bx::kPiHalf));
             f32 rightDir = (xorshift32() & 1) * 2.0 - 1.0;
@@ -57,7 +58,8 @@ void updateAiBasicEnemy(EntityComponentSystem* ecs, CAiBasicEnemy* eltList, cons
 
         if(ai.changeFwdDirCd <= 0.0) {
             ai.changeFwdDirCd = randRange(0.5f, 1.0f);
-            PhysBody& physBody = *ecs->comp_PhysBody[entityId[i]].body;
+            CPhysBody& cpb = ecs->getComp<CPhysBody>(entityId[i]);
+            PhysBody& physBody = cpb.world->bodyDyn[cpb.bodyId];
 
             const f32 dist = vec2Len(diff);
             f32 fwdDir = 1.0f;
@@ -72,17 +74,18 @@ void updateAiBasicEnemy(EntityComponentSystem* ecs, CAiBasicEnemy* eltList, cons
     }
 }
 
-void updateDrawMesh(EntityComponentSystem* ecs, DrawMesh* eltList, const i32 count, i32* entityId,
+void updateDrawMesh(EntityComponentSystem* ecs, CDrawMesh* eltList, const i32 count, i32* entityId,
                     f64 delta, f64 physLerpAlpha)
 {
     Renderer& rdr = getRenderer();
 
     // TODO: optimize this
+    // TODO: move to render() function ?
     for(i32 i = 0; i < count; i++) {
-        DrawMesh& dm = eltList[i];
+        CDrawMesh& dm = eltList[i];
         assert(ecs->entityCompBits[entityId[i]] & ComponentBit::Transform);
 
-        CTransform& baseTf = ecs->comp_Transform[entityId[i]];
+        CTransform& baseTf = ecs->getComp<CTransform>(entityId[i]);
         Transform finalTf = baseTf;
         finalTf.pos += dm.tf.pos;
         finalTf.scale = finalTf.scale * dm.tf.scale;
@@ -91,5 +94,16 @@ void updateDrawMesh(EntityComponentSystem* ecs, DrawMesh* eltList, const i32 cou
         mat4 mtxModel;
         finalTf.toMtx(&mtxModel);
         rdr.drawMesh(dm.hMesh, mtxModel, dm.color);
+    }
+}
+
+void onDeletePhysBody(EntityComponentSystem* ecs, CPhysBody* eltList, const i32 count, i32* entityId, bool8* deleteFlag)
+{
+    for(i32 i = 0; i < count; i++) {
+        if(!deleteFlag[i]) continue;
+        CPhysBody& pb = eltList[i];
+        assert(pb.world);
+        assert(pb.bodyId >= 0);
+        pb.world->removeBodyById(pb.bodyId);
     }
 }

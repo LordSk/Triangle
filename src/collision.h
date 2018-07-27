@@ -76,13 +76,14 @@ struct PhysBody
 struct PhysWorld
 {
     Array<Collider> colStatic;
-    Array<Collider> colDynamic;
-    Array<PhysBody> bodyDyn;
+    ArraySparse<Collider> colDynamic;
+    ArraySparse<PhysBody> bodyDyn;
 
     PhysWorld();
     void clear();
     Collider* addStaticCollider(Collider col);
-    PhysBody* addDynamicBody(Collider col, PhysBody body);
+    PhysBody* addDynamicBody(Collider col, PhysBody body, i32* bid = nullptr);
+    void removeBodyById(i32 bid);
 
     void update(f64 delta, const i32 stepCount);
     void dbgDraw(vec3 offset);

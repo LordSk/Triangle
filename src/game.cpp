@@ -278,18 +278,20 @@ bool GameData::init()
     body.pos = vec2{ 10, 10 };
     body.weight = 1.0;
     body.bounceStrength = 0.0;
-    playerShip.physBody = room.physWorld.addDynamicBody(colPlayer, body);
+    room.physWorld.addDynamicBody(colPlayer, body, &playerShip.physBodyId);
+    playerShip.physWorld = &room.physWorld;
 
     playerShip.dmgBody->collider = colPlayer;
     playerShip.dmgBody->team = DamageWorld::PLAYER;
 
-    for(i32 i = 0; i < 150; ++i) {
+    // create basic enemies
+    for(i32 i = 0; i < 100; ++i) {
         const i32 eid = ecs.createEntity();
         CTransform& tf = ecs.addCompTransform(eid);
         CPhysBody& physBody = ecs.addCompPhysBody(eid);
         CDmgBody& dmgBody = ecs.addCompDmgBody(eid);
-        CAiBasicEnemy& ai = ecs.addAiBasicEnemy(eid);
-        DrawMesh& mesh = ecs.addDrawMesh(eid);
+        CAiBasicEnemy& ai = ecs.addCompAiBasicEnemy(eid);
+        CDrawMesh& mesh = ecs.addCompDrawMesh(eid);
 
         tf.pos = vec3{ (f32)randRange(10, room.size.x-10), (f32)randRange(10, room.size.y-10), 0 };
         tf.scale = vec3Splat(1.5);
@@ -300,7 +302,8 @@ bool GameData::init()
         body.pos = vec3ToVec2(tf.pos);
         body.weight = 1.0;
         body.bounceStrength = 0.0;
-        physBody.body = room.physWorld.addDynamicBody(collider, body);
+        room.physWorld.addDynamicBody(collider, body, &physBody.bodyId);
+        physBody.world = &room.physWorld;
 
         dmgBody.collider = collider;
         dmgBody.team = DamageWorld::ENEMY;
@@ -316,6 +319,50 @@ bool GameData::init()
         quat rotZ;
         bx::quatRotateZ(rotZ, -bx::kPiHalf);
         bx::quatMul(mesh.tf.rot, baseRot, rotZ);
+
+        if(rand01() > 0.1) {
+            ecs.deleteEntity(eid);
+        }
+    }
+
+    for(i32 i = 0; i < 100; ++i) {
+        const i32 eid = ecs.createEntity();
+        CTransform& tf = ecs.addCompTransform(eid);
+        CPhysBody& physBody = ecs.addCompPhysBody(eid);
+        CDmgBody& dmgBody = ecs.addCompDmgBody(eid);
+        CAiBasicEnemy& ai = ecs.addCompAiBasicEnemy(eid);
+        CDrawMesh& mesh = ecs.addCompDrawMesh(eid);
+
+        tf.pos = vec3{ (f32)randRange(10, room.size.x-10), (f32)randRange(10, room.size.y-10), 0 };
+        tf.scale = vec3Splat(1.5);
+
+        PhysBody body{};
+        Collider collider;
+        collider.makeCb(CircleBound{ vec2{0, 0}, 1.5f });
+        body.pos = vec3ToVec2(tf.pos);
+        body.weight = 1.0;
+        body.bounceStrength = 0.0;
+        room.physWorld.addDynamicBody(collider, body, &physBody.bodyId);
+        physBody.world = &room.physWorld;
+
+        dmgBody.collider = collider;
+        dmgBody.team = DamageWorld::ENEMY;
+
+        ai.changeRightDirCd = 0.0;
+        ai.changeFwdDirCd = 0.0;
+
+        mesh.color = {0.0f, 0.0f, 0.5f, 1.0f};
+        mesh.hMesh = meshEyeEn1;
+
+        quat baseRot;
+        bx::quatRotateX(baseRot, -bx::kPiHalf);
+        quat rotZ;
+        bx::quatRotateZ(rotZ, -bx::kPiHalf);
+        bx::quatMul(mesh.tf.rot, baseRot, rotZ);
+
+        if(rand01() > 0.1) {
+            ecs.deleteEntity(eid);
+        }
     }
 
     return true;
@@ -396,7 +443,9 @@ void GameData::update(f64 delta)
 
     rdr.setView(mtxProj, mtxView);
 
+
     ecs.update(delta, physLerpAlpha);
+    ecs.removeFlaggedForDeletion();
 
     static f64 fireCd = 0;
     fireCd -= delta;

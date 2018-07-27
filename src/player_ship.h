@@ -7,7 +7,8 @@
 struct PlayerShip
 {
     CTransform* tf;
-    PhysBody* physBody;
+    PhysWorld* physWorld;
+    i32 physBodyId;
     CDmgBody* dmgBody;
     quat baseRot;
 

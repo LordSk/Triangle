@@ -152,12 +152,13 @@ struct ArraySparse
         return -1;
     }
 
-    inline T& push(T elem) {
+    inline T& push(T elem, i32* out_id = nullptr) {
         i32 id = findFirstFreeId();
         if(id == -1) { // resize eltDataId array
             id = _eltDataId.count();
             _doubleIdListSize();
         }
+        if(out_id) *out_id = id;
         return emplace(id, elem);
     }
 
@@ -189,7 +190,7 @@ struct ArraySparse
 
     inline void removeByElt(const T& elt) {
         assert(&elt >= _data.data() && &elt <= &_data.last());
-        removeById(&elt - _data.data());
+        removeById(_dataEltId[&elt - _data.data()]);
     }
 
     inline i32 count() const {
@@ -204,6 +205,12 @@ struct ArraySparse
         assert(id < _eltDataId.count());
         assert(_eltDataId[id] != -1);
         return _data[_eltDataId[id]];
+    }
+
+    inline void clear() {
+        _data.clear();
+        _dataEltId.clear();
+        _eltDataId.clear();
     }
 };
 

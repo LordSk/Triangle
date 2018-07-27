@@ -19,43 +19,56 @@ struct ComponentBit
 struct EntityComponentSystem
 {
     u64 entityCompBits[MAX_ENTITIES] = {};
+    bool8 entityDeleteFlag[MAX_ENTITIES] = {0};
     ArraySparse<CTransform> comp_Transform;
     ArraySparse<CPhysBody> comp_PhysBody;
     ArraySparse<CDmgBody> comp_DmgBody;
     ArraySparse<CAiBasicEnemy> comp_AiBasicEnemy;
-    ArraySparse<DrawMesh> comp_DrawMesh;
+    ArraySparse<CDrawMesh> comp_DrawMesh;
 
     i32 createEntity();
     void deleteEntity(const i32 eid);
     void update(f64 delta, f64 physLerpAlpha);
+    void removeFlaggedForDeletion();
 
-    inline auto& addCompTransform(const i32 eid) {
-        assert(eid >= 0 && eid < MAX_ENTITIES);
-        entityCompBits[eid] |= ComponentBit::Transform;
-        return comp_Transform.emplace(eid, {});
+#define ADD_FUNC(COMP)\
+    inline auto& addComp##COMP(const i32 eid) {\
+        assert(eid >= 0 && eid < MAX_ENTITIES);\
+        entityCompBits[eid] |= ComponentBit::COMP;\
+        return comp_##COMP.emplace(eid, {});\
     }
 
-    inline auto& addCompPhysBody(const i32 eid) {
-        assert(eid >= 0 && eid < MAX_ENTITIES);
-        entityCompBits[eid] |= ComponentBit::PhysBody;
-        return comp_PhysBody.emplace(eid, {});
+    ADD_FUNC(Transform)
+    ADD_FUNC(PhysBody)
+    ADD_FUNC(DmgBody)
+    ADD_FUNC(AiBasicEnemy)
+    ADD_FUNC(DrawMesh)
+
+#undef ADD_FUNC
+
+    // fancy template getter
+    template<typename T>
+    inline T& getComp(const i32 eid) {
+        return _getComp_imp<T>(eid);
     }
 
-    inline auto& addCompDmgBody(const i32 eid) {
-        assert(eid >= 0 && eid < MAX_ENTITIES);
-        entityCompBits[eid] |= ComponentBit::DmgBody;
-        return comp_DmgBody.emplace(eid, {});
-    }
-
-    inline auto& addAiBasicEnemy(const i32 eid) {
-        assert(eid >= 0 && eid < MAX_ENTITIES);
-        entityCompBits[eid] |= ComponentBit::AiBasicEnemy;
-        return comp_AiBasicEnemy.emplace(eid, {});
-    }
-
-    inline auto& addDrawMesh(const i32 eid) {
-        assert(eid >= 0 && eid < MAX_ENTITIES);
-        entityCompBits[eid] |= ComponentBit::DrawMesh;
-        return comp_DrawMesh.emplace(eid, {});
+    template<typename T>
+    inline auto& _getComp_imp(const i32 eid) {
+        assert(0);
     }
 };
+
+// template specialization for fancy getter
+#define GETTER_FUNC(COMP) template<>\
+inline auto& EntityComponentSystem::_getComp_imp<C##COMP>(const i32 eid) {\
+    assert(eid >= 0 && eid < MAX_ENTITIES);\
+    return comp_##COMP[eid];\
+}
+
+GETTER_FUNC(Transform)
+GETTER_FUNC(PhysBody)
+GETTER_FUNC(DmgBody)
+GETTER_FUNC(AiBasicEnemy)
+GETTER_FUNC(DrawMesh)
+
+#undef GETTER_FUNC

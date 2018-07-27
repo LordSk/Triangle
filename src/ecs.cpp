@@ -14,24 +14,7 @@ i32 EntityComponentSystem::createEntity()
 void EntityComponentSystem::deleteEntity(const i32 eid)
 {
     assert(eid >= 0 && eid < MAX_ENTITIES);
-    u64& compBits = entityCompBits[eid];
-
-    if(compBits & ComponentBit::Transform) {
-        comp_Transform.removeById(eid);
-    }
-    if(compBits & ComponentBit::PhysBody) {
-        comp_PhysBody.removeById(eid);
-    }
-    if(compBits & ComponentBit::DmgBody) {
-        comp_DmgBody.removeById(eid);
-    }
-    if(compBits & ComponentBit::AiBasicEnemy) {
-        comp_AiBasicEnemy.removeById(eid);
-    }
-    if(compBits & ComponentBit::DrawMesh) {
-        comp_DrawMesh.removeById(eid);
-    }
-    compBits = 0;
+    entityDeleteFlag[eid] = true;
 }
 
 void EntityComponentSystem::update(f64 delta, f64 physLerpAlpha)
@@ -45,4 +28,38 @@ void EntityComponentSystem::update(f64 delta, f64 physLerpAlpha)
     UC(DrawMesh);
 
 #undef UC
+}
+
+void EntityComponentSystem::removeFlaggedForDeletion()
+{
+#define DELETE_FUNC(component) onDelete##component(this, comp_##component.data(), comp_##component.count(),\
+    comp_##component._dataEltId.data(), entityDeleteFlag)
+
+    DELETE_FUNC(PhysBody);
+
+#undef DELETE_FUNC
+
+    for(i32 i = 0; i < MAX_ENTITIES; ++i) {
+        if(entityDeleteFlag[i]) {
+            u64& compBits = entityCompBits[i];
+
+            if(compBits & ComponentBit::Transform) {
+                comp_Transform.removeById(i);
+            }
+            if(compBits & ComponentBit::PhysBody) {
+                comp_PhysBody.removeById(i);
+            }
+            if(compBits & ComponentBit::DmgBody) {
+                comp_DmgBody.removeById(i);
+            }
+            if(compBits & ComponentBit::AiBasicEnemy) {
+                comp_AiBasicEnemy.removeById(i);
+            }
+            if(compBits & ComponentBit::DrawMesh) {
+                comp_DrawMesh.removeById(i);
+            }
+            compBits = 0;
+            entityDeleteFlag[i] = false;
+        }
+    }
 }
