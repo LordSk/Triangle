@@ -19,15 +19,12 @@ void EntityComponentSystem::deleteEntity(const i32 eid)
 
 void EntityComponentSystem::update(f64 delta, f64 physLerpAlpha)
 {
-#define UC(component) update##component(this, comp_##component.data(), comp_##component.count(),\
+#define UPDATE_FUNC(component) update##component(this, comp_##component.data(), comp_##component.count(),\
     comp_##component._dataEltId.data(), delta, physLerpAlpha)
 
-    UC(PhysBody);
-    UC(DmgBody);
-    UC(AiBasicEnemy);
-    UC(DrawMesh);
+%%UPDATE_COMPONENT%%
 
-#undef UC
+#undef UPDATE_FUNC
 }
 
 void EntityComponentSystem::removeFlaggedForDeletion()
@@ -35,7 +32,7 @@ void EntityComponentSystem::removeFlaggedForDeletion()
 #define DELETE_FUNC(component) onDelete##component(this, comp_##component.data(), comp_##component.count(),\
     comp_##component._dataEltId.data(), entityDeleteFlag)
 
-    DELETE_FUNC(PhysBody);
+%%ON_DELETE_COMPONENT%%
 
 #undef DELETE_FUNC
 
@@ -43,21 +40,8 @@ void EntityComponentSystem::removeFlaggedForDeletion()
         if(entityDeleteFlag[i]) {
             u64& compBits = entityCompBits[i];
 
-            if(compBits & ComponentBit::Transform) {
-                comp_Transform.removeById(i);
-            }
-            if(compBits & ComponentBit::PhysBody) {
-                comp_PhysBody.removeById(i);
-            }
-            if(compBits & ComponentBit::DmgBody) {
-                comp_DmgBody.removeById(i);
-            }
-            if(compBits & ComponentBit::AiBasicEnemy) {
-                comp_AiBasicEnemy.removeById(i);
-            }
-            if(compBits & ComponentBit::DrawMesh) {
-                comp_DrawMesh.removeById(i);
-            }
+%%REMOVE_COMPONENT%%
+            
             compBits = 0;
             entityDeleteFlag[i] = false;
         }

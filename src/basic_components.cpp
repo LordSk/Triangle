@@ -2,6 +2,11 @@
 #include "ecs.h"
 #include "renderer.h"
 
+void updateTransform(EntityComponentSystem* ecs, CTransform* eltList, const i32 count, i32* entityId, f64 delta, f64 physLerpAlpha)
+{
+
+}
+
 void updatePhysBody(EntityComponentSystem* ecs, CPhysBody* eltList, const i32 count, i32* entityId, f64 delta, f64 physLerpAlpha)
 {
     for(i32 i = 0; i < count; i++) {
@@ -97,6 +102,11 @@ void updateDrawMesh(EntityComponentSystem* ecs, CDrawMesh* eltList, const i32 co
     }
 }
 
+void onDeleteTransform(EntityComponentSystem* ecs, CTransform* eltList, const i32 count, i32* entityId, bool8* deleteFlag)
+{
+
+}
+
 void onDeletePhysBody(EntityComponentSystem* ecs, CPhysBody* eltList, const i32 count, i32* entityId, bool8* deleteFlag)
 {
     for(i32 i = 0; i < count; i++) {
@@ -106,4 +116,19 @@ void onDeletePhysBody(EntityComponentSystem* ecs, CPhysBody* eltList, const i32 
         assert(pb.bodyId >= 0);
         pb.world->removeBodyById(pb.bodyId);
     }
+}
+
+void onDeleteDmgBody(EntityComponentSystem* ecs, CDmgBody* eltList, const i32 count, i32* entityId, bool8* deleteFlag)
+{
+
+}
+
+void onDeleteAiBasicEnemy(EntityComponentSystem* ecs, CAiBasicEnemy* eltList, const i32 count, i32* entityId, bool8* deleteFlag)
+{
+
+}
+
+void onDeleteDrawMesh(EntityComponentSystem* ecs, CDrawMesh* eltList, const i32 count, i32* entityId, bool8* deleteFlag)
+{
+
 }

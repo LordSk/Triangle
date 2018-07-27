@@ -54,6 +54,7 @@ solution "Triangle solution"
 	
 	includedirs {
 		"src",
+		"build/src",
 		SDL2_include,
 		bx_include,
 		bgfx_include,
@@ -103,6 +104,8 @@ project "Triangle"
 		"src/**.h",
 		"src/**.c",
 		"src/**.cpp",
+        "build/src/**.h",
+		"build/src/**.cpp",
         ib_compress_src
 	}
     
