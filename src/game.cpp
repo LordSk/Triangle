@@ -290,10 +290,10 @@ bool GameData::init()
         CTransform& tf = ecs.addCompTransform(eid);
         CPhysBody& physBody = ecs.addCompPhysBody(eid);
         CDmgZone& dmgBody = ecs.addCompDmgZone(eid);
-        CAiBasicEnemy& ai = ecs.addCompAiBasicEnemy(eid);
         CDrawMesh& mesh = ecs.addCompDrawMesh(eid);
         ecs.addCompShipInput(eid);
         ecs.addCompShipControllerAi(eid);
+        ecs.addCompEnemyBasicMovement(eid);
         CShipWeapon& weap = ecs.addCompShipWeapon(eid);
 
         tf.pos = vec3{ (f32)randRange(10, room.size.x-10), (f32)randRange(10, room.size.y-10), 0 };
@@ -311,9 +311,6 @@ bool GameData::init()
         dmgBody.collider = collider;
         dmgBody.team = DamageWorld::ENEMY;
 
-        ai.changeRightDirCd = 0.0;
-        ai.changeFwdDirCd = 0.0;
-
         mesh.color = {(f32)rand01(), (f32)rand01(), (f32)rand01(), 1.0f};
         mesh.hMesh = meshEyeEn1;
 
@@ -323,7 +320,7 @@ bool GameData::init()
         bx::quatRotateZ(rotZ, -bx::kPiHalf);
         bx::quatMul(mesh.tf.rot, baseRot, rotZ);
 
-        weap.rateOfFire = 3.0f;
+        weap.rateOfFire = 2.0f;
         weap.dmgTeam = DamageWorld::ENEMY;
     }
 

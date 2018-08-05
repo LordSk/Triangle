@@ -24,10 +24,9 @@ struct CDmgZone
 };
 
 //@Component
-struct CAiBasicEnemy
+struct CEnemyBasicMovement
 {
-    f32 changeRightDirCd = 0;
-    f32 changeFwdDirCd = 0;
+
 };
 
 //@Component
@@ -67,6 +66,8 @@ struct CShipControllerHuman
 struct CShipControllerAi
 {
     // depends: CShipInput
+    f32 changeRightDirCd = 0;
+    f32 changeFwdDirCd = 0;
 };
 
 void updateTransform(struct EntityComponentSystem* ecs, CTransform* eltList, const i32 count,const i32* entityId,
@@ -75,8 +76,8 @@ void updatePhysBody(struct EntityComponentSystem* ecs, CPhysBody* eltList, const
                     f64 delta, f64 physLerpAlpha);
 void updateDmgZone(struct EntityComponentSystem* ecs, CDmgZone* eltList, const i32 count,const i32* entityId,
                    f64 delta, f64 physLerpAlpha);
-void updateAiBasicEnemy(struct EntityComponentSystem* ecs, CAiBasicEnemy* eltList, const i32 count,
-                       const i32* entityId, f64 delta, f64 physLerpAlpha);
+void updateEnemyBasicMovement(struct EntityComponentSystem* ecs, CEnemyBasicMovement* eltList,
+                               const i32 count, const i32* entityId, f64 delta, f64 physLerpAlpha);
 void updateDrawMesh(struct EntityComponentSystem* ecs, CDrawMesh* eltList, const i32 count,
                    const i32* entityId, f64 delta, f64 physLerpAlpha);
 void updateBulletMovement(struct EntityComponentSystem* ecs, CBulletMovement* eltList, const i32 count,
@@ -94,8 +95,8 @@ void onDeletePhysBody(struct EntityComponentSystem* ecs, CPhysBody* eltList, con
                      const i32* entityId, bool8* entDeleteFlag);
 void onDeleteDmgZone(struct EntityComponentSystem* ecs, CDmgZone* eltList, const i32 count,
                       const i32* entityId, bool8* entDeleteFlag);
-void onDeleteAiBasicEnemy(struct EntityComponentSystem* ecs, CAiBasicEnemy* eltList, const i32 count,
-                      const i32* entityId, bool8* entDeleteFlag);
+void onDeleteEnemyBasicMovement(struct EntityComponentSystem* ecs, CEnemyBasicMovement* eltList,
+                                const i32 count, const i32* entityId, bool8* entDeleteFlag);
 void onDeleteDrawMesh(struct EntityComponentSystem* ecs, CDrawMesh* eltList, const i32 count,
                       const i32* entityId, bool8* entDeleteFlag);
 void onDeleteBulletMovement(struct EntityComponentSystem* ecs, CBulletMovement* eltList, const i32 count,

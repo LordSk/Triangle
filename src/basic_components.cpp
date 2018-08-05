@@ -35,17 +35,22 @@ void updateDmgZone(EntityComponentSystem* ecs, CDmgZone* eltList, const i32 coun
     }
 }
 
-void updateAiBasicEnemy(EntityComponentSystem* ecs, CAiBasicEnemy* eltList, const i32 count,
+void updateEnemyBasicMovement(EntityComponentSystem* ecs, CEnemyBasicMovement* eltList, const i32 count,
                         const i32* entityId, f64 delta, f64 physLerpAlpha)
 {
-    vec2 target = {50, 50};
+    const vec2 target = {50, 50};
 
     for(i32 i = 0; i < count; i++) {
-        CAiBasicEnemy& ai = eltList[i];
+        const i32 eid = entityId[i];
         assert(ecs->entityCompBits[entityId[i]] & ComponentBit::Transform);
         assert(ecs->entityCompBits[entityId[i]] & ComponentBit::PhysBody);
+        assert(ecs->entityCompBits[entityId[i]] & ComponentBit::ShipInput);
 
-        CTransform& tf = ecs->getCompTransform(entityId[i]);
+        CTransform& tf = ecs->getCompTransform(eid);
+        CShipInput& input = ecs->getCompShipInput(eid);
+        CPhysBody& cpb = ecs->getCompPhysBody(eid);
+        PhysBody& physBody = cpb.world->bodyDyn[cpb.bodyId];
+
         const vec2 pos2 = vec3ToVec2(tf.pos);
         const vec2 diff = target - pos2;
 
@@ -53,34 +58,12 @@ void updateAiBasicEnemy(EntityComponentSystem* ecs, CAiBasicEnemy* eltList, cons
         const f32 angle = atan2(-diff.y, diff.x);
         bx::quatRotateZ(tf.rot, angle);
 
-        ai.changeRightDirCd -= delta;
-        ai.changeFwdDirCd -= delta;
+        const vec2 right = vec2Norm(vec2Rotate(diff, bx::kPiHalf));
+        const f32 rightDir = input.right - input.left;
+        physBody.vel = right * (rightDir * 5.0f);
 
-        if(ai.changeRightDirCd <= 0.0) {
-            ai.changeRightDirCd = randRange(1.0f, 2.0f);
-            CPhysBody& cpb = ecs->getCompPhysBody(entityId[i]);
-            PhysBody& physBody = cpb.world->bodyDyn[cpb.bodyId];
-
-            vec2 right = vec2Norm(vec2Rotate(diff, bx::kPiHalf));
-            f32 rightDir = (xorshift32() & 1) * 2.0 - 1.0;
-            physBody.vel = right * (rightDir * 5.0f) + vec2Norm(diff) * randRange(-5.0f, 5.0f);
-        }
-
-        if(ai.changeFwdDirCd <= 0.0) {
-            ai.changeFwdDirCd = randRange(0.5f, 1.0f);
-            CPhysBody& cpb = ecs->getCompPhysBody(entityId[i]);
-            PhysBody& physBody = cpb.world->bodyDyn[cpb.bodyId];
-
-            const f32 dist = vec2Len(diff);
-            f32 fwdDir = 1.0f;
-            if(dist < 25) {
-                fwdDir = (xorshift32() & 1) * 2.0 - 1.0;
-            }
-            if(dist < 10) {
-                fwdDir = -1.0f;
-            }
-            physBody.vel += vec2Norm(diff) * (fwdDir * 5.0f);
-        }
+        const f32 fwdDir = (input.up - input.down);
+        physBody.vel += vec2Norm(diff) * (fwdDir * 5.0f);
     }
 }
 
@@ -152,11 +135,46 @@ void updateShipControllerHuman(EntityComponentSystem* ecs, CShipControllerHuman*
 void updateShipControllerAi(EntityComponentSystem* ecs, CShipControllerAi* eltList, const i32 count,
                             const i32* entityId, f64 delta, f64 physLerpAlpha)
 {
+    const vec2 target = {50, 50};
+
     for(i32 i = 0; i < count; i++) {
+        CShipControllerAi& ai = eltList[i];
         const i32 eid = entityId[i];
+        assert(ecs->entityCompBits[eid] & ComponentBit::Transform);
         assert(ecs->entityCompBits[eid] & ComponentBit::ShipInput);
-        CShipInput& isc = ecs->getCompShipInput(eid);
-        isc.fire = true;
+
+        CTransform& tf = ecs->getCompTransform(eid);
+        const vec2 pos2 = vec3ToVec2(tf.pos);
+        const vec2 diff = target - pos2;
+
+        CShipInput& input = ecs->getCompShipInput(eid);
+        input.fire = true;
+
+        ai.changeRightDirCd -= delta;
+        ai.changeFwdDirCd -= delta;
+
+        if(ai.changeRightDirCd <= 0.0) {
+            ai.changeRightDirCd = randRange(1.0f, 2.0f);
+            bool8 rightDir = xorshift32() & 1;
+            input.left = !rightDir;
+            input.right = rightDir;
+        }
+
+        if(ai.changeFwdDirCd <= 0.0) {
+            ai.changeFwdDirCd = randRange(0.5f, 1.0f);
+
+            const f32 dist = vec2Len(diff);
+            i32 fwdDir = 1.0f;
+            if(dist < 25) {
+                fwdDir = (xorshift32() & 1) * 2 - 1;
+            }
+            if(dist < 10) {
+                fwdDir = -1;
+            }
+
+            input.up = fwdDir == 1;
+            input.down = fwdDir == -1;
+        }
     }
 }
 
@@ -182,7 +200,7 @@ void onDeleteDmgZone(EntityComponentSystem* ecs, CDmgZone* eltList, const i32 co
 {
 }
 
-void onDeleteAiBasicEnemy(EntityComponentSystem* ecs, CAiBasicEnemy* eltList, const i32 count
+void onDeleteEnemyBasicMovement(EntityComponentSystem* ecs, CEnemyBasicMovement* eltList, const i32 count
                           ,const i32* entityId, bool8* entDeleteFlag)
 {
 }
