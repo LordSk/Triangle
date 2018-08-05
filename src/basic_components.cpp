@@ -1,37 +1,42 @@
 #include "basic_components.h"
 #include "ecs.h"
 #include "renderer.h"
+#include "input_recorder.h"
 
-void updateTransform(EntityComponentSystem* ecs, CTransform* eltList, const i32 count, i32* entityId, f64 delta, f64 physLerpAlpha)
+void updateTransform(EntityComponentSystem* ecs, CTransform* eltList, const i32 count, const i32* entityId,
+                     f64 delta, f64 physLerpAlpha)
 {
 
 }
 
-void updatePhysBody(EntityComponentSystem* ecs, CPhysBody* eltList, const i32 count, i32* entityId, f64 delta, f64 physLerpAlpha)
+void updatePhysBody(EntityComponentSystem* ecs, CPhysBody* eltList, const i32 count, const i32* entityId,
+                    f64 delta, f64 physLerpAlpha)
 {
     for(i32 i = 0; i < count; i++) {
         const PhysBody& body = eltList[i].world->bodyDyn[eltList[i].bodyId];
         assert(ecs->entityCompBits[entityId[i]] & ComponentBit::Transform);
 
-        CTransform& tf = ecs->getComp<CTransform>(entityId[i]);
+        CTransform& tf = ecs->getCompTransform(entityId[i]);
         vec2 pos2 = vec2Lerp(body.prevPos, body.pos, physLerpAlpha);
         tf.pos.x = pos2.x;
         tf.pos.y = pos2.y;
     }
 }
 
-void updateDmgBody(EntityComponentSystem* ecs, CDmgBody* eltList, const i32 count, i32* entityId, f64 delta, f64 physLerpAlpha)
+void updateDmgZone(EntityComponentSystem* ecs, CDmgZone* eltList, const i32 count, const i32* entityId,
+                   f64 delta, f64 physLerpAlpha)
 {
     for(i32 i = 0; i < count; i++) {
-        CDmgBody& dmgBody = eltList[i];
+        CDmgZone& dmgBody = eltList[i];
         assert(ecs->entityCompBits[entityId[i]] & ComponentBit::Transform);
 
-        CTransform& tf = ecs->getComp<CTransform>(entityId[i]);
+        CTransform& tf = ecs->getCompTransform(entityId[i]);
         dmgBody.collider.setPos(vec3ToVec2(tf.pos));
     }
 }
 
-void updateAiBasicEnemy(EntityComponentSystem* ecs, CAiBasicEnemy* eltList, const i32 count, i32* entityId, f64 delta, f64 physLerpAlpha)
+void updateAiBasicEnemy(EntityComponentSystem* ecs, CAiBasicEnemy* eltList, const i32 count,
+                        const i32* entityId, f64 delta, f64 physLerpAlpha)
 {
     vec2 target = {50, 50};
 
@@ -40,7 +45,7 @@ void updateAiBasicEnemy(EntityComponentSystem* ecs, CAiBasicEnemy* eltList, cons
         assert(ecs->entityCompBits[entityId[i]] & ComponentBit::Transform);
         assert(ecs->entityCompBits[entityId[i]] & ComponentBit::PhysBody);
 
-        CTransform& tf = ecs->getComp<CTransform>(entityId[i]);
+        CTransform& tf = ecs->getCompTransform(entityId[i]);
         const vec2 pos2 = vec3ToVec2(tf.pos);
         const vec2 diff = target - pos2;
 
@@ -53,7 +58,7 @@ void updateAiBasicEnemy(EntityComponentSystem* ecs, CAiBasicEnemy* eltList, cons
 
         if(ai.changeRightDirCd <= 0.0) {
             ai.changeRightDirCd = randRange(1.0f, 2.0f);
-            CPhysBody& cpb = ecs->getComp<CPhysBody>(entityId[i]);
+            CPhysBody& cpb = ecs->getCompPhysBody(entityId[i]);
             PhysBody& physBody = cpb.world->bodyDyn[cpb.bodyId];
 
             vec2 right = vec2Norm(vec2Rotate(diff, bx::kPiHalf));
@@ -63,7 +68,7 @@ void updateAiBasicEnemy(EntityComponentSystem* ecs, CAiBasicEnemy* eltList, cons
 
         if(ai.changeFwdDirCd <= 0.0) {
             ai.changeFwdDirCd = randRange(0.5f, 1.0f);
-            CPhysBody& cpb = ecs->getComp<CPhysBody>(entityId[i]);
+            CPhysBody& cpb = ecs->getCompPhysBody(entityId[i]);
             PhysBody& physBody = cpb.world->bodyDyn[cpb.bodyId];
 
             const f32 dist = vec2Len(diff);
@@ -79,7 +84,7 @@ void updateAiBasicEnemy(EntityComponentSystem* ecs, CAiBasicEnemy* eltList, cons
     }
 }
 
-void updateDrawMesh(EntityComponentSystem* ecs, CDrawMesh* eltList, const i32 count, i32* entityId,
+void updateDrawMesh(EntityComponentSystem* ecs, CDrawMesh* eltList, const i32 count, const i32* entityId,
                     f64 delta, f64 physLerpAlpha)
 {
     Renderer& rdr = getRenderer();
@@ -90,7 +95,7 @@ void updateDrawMesh(EntityComponentSystem* ecs, CDrawMesh* eltList, const i32 co
         CDrawMesh& dm = eltList[i];
         assert(ecs->entityCompBits[entityId[i]] & ComponentBit::Transform);
 
-        CTransform& baseTf = ecs->getComp<CTransform>(entityId[i]);
+        CTransform& baseTf = ecs->getCompTransform(entityId[i]);
         Transform finalTf = baseTf;
         finalTf.pos += dm.tf.pos;
         finalTf.scale = finalTf.scale * dm.tf.scale;
@@ -102,15 +107,53 @@ void updateDrawMesh(EntityComponentSystem* ecs, CDrawMesh* eltList, const i32 co
     }
 }
 
-void onDeleteTransform(EntityComponentSystem* ecs, CTransform* eltList, const i32 count, i32* entityId, bool8* deleteFlag)
+void updateBulletMovement(EntityComponentSystem* ecs, CBulletMovement* eltList, const i32 count,
+                          const i32* entityId, f64 delta, f64 physLerpAlpha)
+{
+    for(i32 i = 0; i < count; i++) {
+        CBulletMovement& bulletMove = eltList[i];
+        const i32 eid = entityId[i];
+        assert(ecs->entityCompBits[eid] & ComponentBit::Transform);
+        CTransform& tf = ecs->getCompTransform(eid);
+        vec2& bpos = bulletMove.pos;
+        bpos += bulletMove.vel * delta;
+        tf.pos.x = bpos.x;
+        tf.pos.y = bpos.y;
+
+        if(bpos.x < -200 || bpos.x > 200 ||
+           bpos.y < -200 || bpos.y > 200) {
+            ecs->deleteEntity(eid);
+        }
+    }
+}
+
+void updateInputShipController(EntityComponentSystem* ecs, CInputShipController* eltList, const i32 count,
+                               const i32* entityId, f64 delta, f64 physLerpAlpha)
+{
+    // TODO: could be optimized...
+    for(i32 i = 0; i < count; i++) {
+        CInputShipController& isc = eltList[i];
+        isc.up = inputIsKeyPressed(Vkey::Up);
+        isc.down = inputIsKeyPressed(Vkey::Down);
+        isc.left = inputIsKeyPressed(Vkey::Left);
+        isc.right = inputIsKeyPressed(Vkey::Right);
+        isc.fire = inputIsKeyPressed(Vkey::Fire);
+        inputGetMousePos(&isc.mouseX, &isc.mouseY);
+    }
+}
+
+
+void onDeleteTransform(EntityComponentSystem* ecs, CTransform* eltList, const i32 count,
+                       const i32* entityId, bool8* entDeleteFlag)
 {
 
 }
 
-void onDeletePhysBody(EntityComponentSystem* ecs, CPhysBody* eltList, const i32 count, i32* entityId, bool8* deleteFlag)
+void onDeletePhysBody(EntityComponentSystem* ecs, CPhysBody* eltList, const i32 count,
+                      const i32* entityId, bool8* entDeleteFlag)
 {
     for(i32 i = 0; i < count; i++) {
-        if(!deleteFlag[i]) continue;
+        if(!entDeleteFlag[entityId[i]]) continue;
         CPhysBody& pb = eltList[i];
         assert(pb.world);
         assert(pb.bodyId >= 0);
@@ -118,17 +161,32 @@ void onDeletePhysBody(EntityComponentSystem* ecs, CPhysBody* eltList, const i32 
     }
 }
 
-void onDeleteDmgBody(EntityComponentSystem* ecs, CDmgBody* eltList, const i32 count, i32* entityId, bool8* deleteFlag)
+void onDeleteDmgZone(EntityComponentSystem* ecs, CDmgZone* eltList, const i32 count,
+                     const i32* entityId, bool8* entDeleteFlag)
 {
 
 }
 
-void onDeleteAiBasicEnemy(EntityComponentSystem* ecs, CAiBasicEnemy* eltList, const i32 count, i32* entityId, bool8* deleteFlag)
+void onDeleteAiBasicEnemy(EntityComponentSystem* ecs, CAiBasicEnemy* eltList, const i32 count
+                          ,const i32* entityId, bool8* entDeleteFlag)
 {
 
 }
 
-void onDeleteDrawMesh(EntityComponentSystem* ecs, CDrawMesh* eltList, const i32 count, i32* entityId, bool8* deleteFlag)
+void onDeleteDrawMesh(EntityComponentSystem* ecs, CDrawMesh* eltList, const i32 count,
+                     const i32* entityId, bool8* entDeleteFlag)
+{
+
+}
+
+void onDeleteBulletMovement(EntityComponentSystem* ecs, CBulletMovement* eltList, const i32 count,
+                           const i32* entityId, bool8* entDeleteFlag)
+{
+
+}
+
+void onDeleteInputShipController(EntityComponentSystem* ecs, CInputShipController* eltList, const i32 count,
+                                const i32* entityId, bool8* entDeleteFlag)
 {
 
 }

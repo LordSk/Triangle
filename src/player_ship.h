@@ -4,36 +4,16 @@
 #include "vector_math.h"
 #include "basic_components.h"
 
-struct PlayerShip
+//@Component
+struct CPlayerShipMovement
 {
-    CTransform* tf;
-    PhysWorld* physWorld;
-    i32 physBodyId;
-    CDmgBody* dmgBody;
-    quat baseRot;
-
-    vec3 mousePosScreen;
-    vec3 mousePosWorld;
-    f32 angle;
-
-    struct {
-        bool8 left;
-        bool8 right;
-        bool8 up;
-        bool8 down;
-        bool8 fire;
-    } input = {};
-
-    void init();
-    void handleEvent(const SDL_Event& event);
-    void update(f64 delta, f64 physWorldAlpha);
-    void computeCursorPos(const mat4& invViewProj, f32 camHeight);
+    f32 accel = 300.0f;
+    f32 deccel = 15.0f;
+    f32 maxSpeed = 40.0f;
+    vec3 curXyPlanePos;
 };
 
-struct WeaponBullet
-{
-    CTransform* tf;
-    CDmgBody* dmgBody;
-    vec2 pos;
-    vec2 vel;
-};
+void updatePlayerShipMovement(struct EntityComponentSystem* ecs, CPlayerShipMovement* eltList,
+                               const i32 count, const i32* entityId, f64 delta, f64 physLerpAlpha);
+void onDeletePlayerShipMovement(struct EntityComponentSystem* ecs, CPlayerShipMovement* eltList,
+                                 const i32 count,const i32* entityId, bool8* entDeleteFlag);

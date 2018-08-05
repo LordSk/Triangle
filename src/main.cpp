@@ -23,6 +23,7 @@
 #include "collision.h"
 #include "game.h"
 #include "renderer.h"
+#include "input_recorder.h"
 
 #define WINDOW_WIDTH 1600
 #define WINDOW_HEIGHT 900
@@ -147,6 +148,9 @@ i32 run()
         if(showUI) {
             imguiEndFrame();
         }
+        else {
+            ImGui::EndFrame(); // don't render
+        }
 
         render();
 
@@ -159,6 +163,7 @@ i32 run()
 
 void handleEvent(const SDL_Event& event)
 {
+    inputRecorderHandleEvent(event);
     game.handlEvent(event);
 
     if(mouseCaptured) {
@@ -213,14 +218,10 @@ void updateUI(f64 delta)
         }
     }
 
-    if(!showUI) {
-        return;
-    }
-
     imguiBeginFrame(mx, my, buttons, WINDOW_WIDTH, WINDOW_HEIGHT, 0xff, RdrViewID::UI);
 
     // ui code here
-    im::ShowDemoWindow();
+    //im::ShowDemoWindow();
 
     im::Begin("Debug");
 
@@ -230,6 +231,7 @@ void updateUI(f64 delta)
     im::Checkbox("Enable grid", &renderer.dbgEnableGrid);
     im::Checkbox("Enable world origin", &renderer.dbgEnableWorldOrigin);
     im::Checkbox("Enable debug physics", &renderer.dbgEnableDbgPhysics);
+    im::Checkbox("Enable debug damage zones", &game.dbgEnableDmgZones);
 
     im::End();
 

@@ -1,6 +1,7 @@
 #pragma once
 #include "utils.h"
 #include "basic_components.h"
+#include "player_ship.h"
 
 struct ComponentBit
 {
@@ -34,25 +35,17 @@ struct EntityComponentSystem
 
 #undef ADD_FUNC
 
-    // fancy template getter
-    template<typename T>
-    inline T& getComp(const i32 eid) {
-        return _getComp_imp<T>(eid);
-    }
-
-    template<typename T>
-    inline auto& _getComp_imp(const i32 eid) {
-        assert(0);
-    }
-};
-
-// template specialization for fancy getter
-#define GETTER_FUNC(COMP) template<>\
-inline auto& EntityComponentSystem::_getComp_imp<C##COMP>(const i32 eid) {\
+#define GETTER_FUNC(COMP)\
+inline auto& getComp##COMP(const i32 eid) {\
     assert(eid >= 0 && eid < MAX_ENTITIES);\
+    assert(entityCompBits[eid] & ComponentBit::COMP);\
     return comp_##COMP[eid];\
 }
 
 %%GETTER_COMPONENT%%
 
 #undef GETTER_FUNC
+    
+};
+
+

@@ -121,6 +121,7 @@ struct GameData
     CameraFreeFlight camFree;
 
     f32 dbgPlayerCamHeight = 30;
+    bool dbgEnableDmgZones = false;
 
     MeshHandle meshPlayerShip;
     MeshHandle meshEyeEn1;
@@ -129,12 +130,11 @@ struct GameData
 
     Room room;
     DamageWorld dmgWorld;
-    PlayerShip playerShip;
-    WeaponBullet weapBulletList[100];
+    i32 playerEid = -1;
     i32 weapBulletCount = 0;
 
     CTransform compTransform[1000];
-    CDmgBody compDmgBody[1000];
+    CDmgZone compDmgBody[1000];
     i32 compTransformCount = 0;
     i32 compDmgBodyCount = 0;
 

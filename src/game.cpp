@@ -3,6 +3,7 @@
 #include "renderer.h"
 #include "dbg_draw.h"
 #include "collision.h"
+#include <imgui/imgui.h>
 
 DamageWorld::DamageWorld()
 {
@@ -242,54 +243,47 @@ bool GameData::init()
     room.make(vec3{100, 50, 10}, 4);
     room.tfRoom.pos.z = 3;
 
-    /*
-    Collider col;
-    OrientedBoundingBox obb;
-    obb.origin = vec2{10, 10};
-    obb.size = vec2{10, 20};
-    obb.angle = bx::kPiQuarter;
-    room.physWorld.addStaticCollider(col.makeObb(obb));
+    // create player entity
+    playerEid = ecs.createEntity();
+    CTransform& playerTf = ecs.addCompTransform(playerEid);
+    CPhysBody& playerPhysBody = ecs.addCompPhysBody(playerEid);
+    CDmgZone& playerDmgBody = ecs.addCompDmgZone(playerEid);
+    CDrawMesh& playerMesh = ecs.addCompDrawMesh(playerEid);
+    CInputShipController& playerInput = ecs.addCompInputShipController(playerEid);
+    CPlayerShipMovement& playerMovt = ecs.addCompPlayerShipMovement(playerEid);
+    playerTf.pos = {10, 10, 0};
+    playerTf.scale = {0.5f, 0.5f, 0.5f};
 
-    for(i32 i = 0; i < 100; i++) {
-        Collider col;
-        CircleBound cb;
-        cb.center = vec2{f32(10 + rand01() * 90), f32(10 + rand01() * 40)};
-        cb.radius = 1.0 + rand01() * 1;
-        PhysBody ball;
-        f32 a = rand01() * bx::kPi2;
-        f32 speed = 10 + rand01() * 50;
-        ball.vel = { cos(a) * speed, sin(a) * speed };
-        ball.pos = cb.center;
-        ball.bounceStrength = 1.0;
-        room.physWorld.addDynamicBody(col.makeCb(cb), ball);
-    }
-    */
-
-    playerShip.tf = &compTransform[compTransformCount++];
-    playerShip.dmgBody = &compDmgBody[compDmgBodyCount++];
-
-
-    playerShip.init();
-    playerShip.tf->pos = {10, 10, 0};
-
-    PhysBody body = {};
+    PhysBody body{};
     Collider colPlayer;
     colPlayer.makeCb(CircleBound{ vec2{0, 0}, 1.2f });
     body.pos = vec2{ 10, 10 };
     body.weight = 1.0;
     body.bounceStrength = 0.0;
-    room.physWorld.addDynamicBody(colPlayer, body, &playerShip.physBodyId);
-    playerShip.physWorld = &room.physWorld;
+    room.physWorld.addDynamicBody(colPlayer, body, &playerPhysBody.bodyId);
+    playerPhysBody.world = &room.physWorld;
 
-    playerShip.dmgBody->collider = colPlayer;
-    playerShip.dmgBody->team = DamageWorld::PLAYER;
+    colPlayer.makeCb(CircleBound{ vec2{0, 0}, 1.0f });
+    playerDmgBody.collider = colPlayer;
+    playerDmgBody.team = DamageWorld::PLAYER;
+
+    playerMesh.color = {1.0f, 0, 0, 1.0f};
+    playerMesh.hMesh = meshPlayerShip;
+
+    quat baseRot;
+    bx::quatRotateX(baseRot, -bx::kPiHalf);
+    quat rotZ;
+    bx::quatRotateZ(rotZ, -bx::kPiHalf);
+    bx::quatMul(playerMesh.tf.rot, baseRot, rotZ);
+    // --------------------
+
 
     // create basic enemies
-    for(i32 i = 0; i < 100; ++i) {
+    for(i32 i = 0; i < 15; ++i) {
         const i32 eid = ecs.createEntity();
         CTransform& tf = ecs.addCompTransform(eid);
         CPhysBody& physBody = ecs.addCompPhysBody(eid);
-        CDmgBody& dmgBody = ecs.addCompDmgBody(eid);
+        CDmgZone& dmgBody = ecs.addCompDmgZone(eid);
         CAiBasicEnemy& ai = ecs.addCompAiBasicEnemy(eid);
         CDrawMesh& mesh = ecs.addCompDrawMesh(eid);
 
@@ -311,7 +305,7 @@ bool GameData::init()
         ai.changeRightDirCd = 0.0;
         ai.changeFwdDirCd = 0.0;
 
-        mesh.color = {0.5f, 0.0f, 1.0f, 1.0f};
+        mesh.color = {(f32)rand01(), (f32)rand01(), (f32)rand01(), 1.0f};
         mesh.hMesh = meshEyeEn1;
 
         quat baseRot;
@@ -319,50 +313,6 @@ bool GameData::init()
         quat rotZ;
         bx::quatRotateZ(rotZ, -bx::kPiHalf);
         bx::quatMul(mesh.tf.rot, baseRot, rotZ);
-
-        if(rand01() > 0.1) {
-            ecs.deleteEntity(eid);
-        }
-    }
-
-    for(i32 i = 0; i < 100; ++i) {
-        const i32 eid = ecs.createEntity();
-        CTransform& tf = ecs.addCompTransform(eid);
-        CPhysBody& physBody = ecs.addCompPhysBody(eid);
-        CDmgBody& dmgBody = ecs.addCompDmgBody(eid);
-        CAiBasicEnemy& ai = ecs.addCompAiBasicEnemy(eid);
-        CDrawMesh& mesh = ecs.addCompDrawMesh(eid);
-
-        tf.pos = vec3{ (f32)randRange(10, room.size.x-10), (f32)randRange(10, room.size.y-10), 0 };
-        tf.scale = vec3Splat(1.5);
-
-        PhysBody body{};
-        Collider collider;
-        collider.makeCb(CircleBound{ vec2{0, 0}, 1.5f });
-        body.pos = vec3ToVec2(tf.pos);
-        body.weight = 1.0;
-        body.bounceStrength = 0.0;
-        room.physWorld.addDynamicBody(collider, body, &physBody.bodyId);
-        physBody.world = &room.physWorld;
-
-        dmgBody.collider = collider;
-        dmgBody.team = DamageWorld::ENEMY;
-
-        ai.changeRightDirCd = 0.0;
-        ai.changeFwdDirCd = 0.0;
-
-        mesh.color = {0.0f, 0.0f, 0.5f, 1.0f};
-        mesh.hMesh = meshEyeEn1;
-
-        quat baseRot;
-        bx::quatRotateX(baseRot, -bx::kPiHalf);
-        quat rotZ;
-        bx::quatRotateZ(rotZ, -bx::kPiHalf);
-        bx::quatMul(mesh.tf.rot, baseRot, rotZ);
-
-        if(rand01() > 0.1) {
-            ecs.deleteEntity(eid);
-        }
     }
 
     return true;
@@ -382,14 +332,15 @@ void GameData::handlEvent(const SDL_Event& event)
             cameraId = cameraId % 2;
             return;
         }
+        if(event.key.keysym.sym == SDLK_b) {
+            dbgEnableDmgZones ^= 1;
+            return;
+        }
     }
 
     if(mouseCaptured) {
         if(cameraId == CameraID::FREE_VIEW) {
             camFree.handleEvent(event);
-        }
-        else if(cameraId == CameraID::PLAYER_VIEW) {
-            playerShip.handleEvent(event);
         }
     }
 }
@@ -411,10 +362,6 @@ void GameData::update(f64 delta)
 
     const f64 physLerpAlpha = physWorldTimeAcc / PHYS_UPDATE_DELTA;
 
-    // update player ship
-    playerShip.update(delta, physLerpAlpha);
-    playerShip.dmgBody->collider.setPos(vec3ToVec2(playerShip.tf->pos));
-
     // set camera view
     mat4 mtxProj, mtxView;
     const vec3 up = { 0.0f, 0.0f, 1.0f };
@@ -430,15 +377,9 @@ void GameData::update(f64 delta)
     }
     else if(cameraId == CameraID::PLAYER_VIEW) {
         CameraBirdView camBv;
-        camBv.pos = playerShip.tf->pos;
+        camBv.pos = ecs.getCompTransform(playerEid).pos;
         camBv.height = dbgPlayerCamHeight;
         camBv.compute(&mtxView);
-
-        mat4 invView;
-        mat4 viewProj;
-        bx::mtxMul(viewProj, mtxView, mtxProj);
-        bx::mtxInverse(invView, viewProj);
-        playerShip.computeCursorPos(invView, dbgPlayerCamHeight);
     }
 
     rdr.setView(mtxProj, mtxView);
@@ -447,46 +388,53 @@ void GameData::update(f64 delta)
     ecs.update(delta, physLerpAlpha);
     ecs.removeFlaggedForDeletion();
 
-    static f64 fireCd = 0;
+    // TODO: reimplement
+    /*static f64 fireCd = 0;
     fireCd -= delta;
     if(fireCd <= 0.0 && playerShip.input.fire) {
         fireCd = 0.1;
-        WeaponBullet bullet;
+
+        // bullet entity
+        const i32 eid = ecs.createEntity();
+        ecs.addCompTransform(eid);
+        CBulletMovement& bm = ecs.addCompBulletMovement(eid);
+        CDmgZone& dmgBody = ecs.addCompDmgZone(eid);
 
         Collider bulletCol;
         bulletCol.makeCb(CircleBound{vec2{0, 0}, 0.7f});
-        assert(compDmgBodyCount < arr_count(compDmgBody));
-        bullet.dmgBody = &compDmgBody[compDmgBodyCount++];
-        bullet.dmgBody->collider = bulletCol;
-        bullet.dmgBody->team = DamageWorld::PLAYER;
-        bullet.pos = vec3ToVec2(playerShip.tf->pos);
-        bullet.vel = vec2Norm(vec3ToVec2(playerShip.mousePosWorld - playerShip.tf->pos)) * 40.0f;
-        assert(weapBulletCount < arr_count(weapBulletList));
-        weapBulletList[weapBulletCount++] = bullet;
-    }
-
-
-    const i32 weapBulletCount2 = weapBulletCount;
-    for(i32 i = 0; i < weapBulletCount2; i++) {
-        WeaponBullet& wb = weapBulletList[i];
-        wb.pos += wb.vel * delta;
-        wb.dmgBody->collider.setPos(wb.pos);
-    }
+        dmgBody.collider = bulletCol;
+        dmgBody.team = DamageWorld::PLAYER;
+        bm.pos = vec3ToVec2(playerShip.tf->pos);
+        bm.vel = vec2Norm(vec3ToVec2(playerShip.mousePosWorld - playerShip.tf->pos)) * 60.0f;
+    }*/
 
     dmgWorld.clearZones();
 
-    dmgWorld.registerZone(DamageWorld::PLAYER, playerShip.dmgBody->collider, {});
-
-    for(i32 i = 0; i < ecs.comp_DmgBody.count(); ++i) {
-        const CDmgBody& dmgBody = ecs.comp_DmgBody.data()[i];
+    for(i32 i = 0; i < ecs.comp_DmgZone.count(); ++i) {
+        const CDmgZone& dmgBody = ecs.comp_DmgZone.data()[i];
         dmgWorld.registerZone((DamageWorld::Team)dmgBody.team, dmgBody.collider, {});
     }
 
-    dmgWorld.dbgDraw();
+    if(dbgEnableDmgZones) {
+       dmgWorld.dbgDraw();
+    }
 
     static Array<DamageWorld::IntersectInfo> intersectList;
     intersectList.reserve(2048);
     dmgWorld.resolveIntersections(&intersectList);
+
+
+    ImGui::Begin("EntityComponentSystem");
+
+    i32 entityCount = 0;
+    for(i32 i = 0; i < MAX_ENTITIES; i++) {
+        entityCount += ecs.entityCompBits[i] != 0;
+    }
+
+    ImGui::Text("Entity count (%d/%d):", entityCount, MAX_ENTITIES);
+    ImGui::ProgressBar((f32)entityCount/MAX_ENTITIES);
+
+    ImGui::End();
 }
 
 void GameData::render()
@@ -522,15 +470,12 @@ void GameData::render()
     rdr.drawCubeInstances(instData.data(), cubeCount);
 #endif
 
-    //player ship
-    mat4 mtxModel;
-    playerShip.tf->toMtx(&mtxModel);
-    rdr.drawMesh(meshPlayerShip, mtxModel, vec4{1, 0, 0, 1});
-
+    // TODO: temporary
     // mouse cursor
     if(cameraId == CameraID::PLAYER_VIEW) {
         Transform tfCursor;
-        tfCursor.pos = playerShip.mousePosWorld - vec3 {0.2f, 0.2f, 0.2f};
+        const vec3 curPos = ecs.getCompPlayerShipMovement(playerEid).curXyPlanePos;
+        tfCursor.pos = curPos - vec3 {0.2f, 0.2f, 0.2f};
         tfCursor.scale = { 0.4f, 0.4f, 0.4f };
         dbgDrawRect(tfCursor, vec4{1, 0, 1, 1});
     }
