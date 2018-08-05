@@ -251,6 +251,8 @@ bool GameData::init()
     CDrawMesh& playerMesh = ecs.addCompDrawMesh(playerEid);
     CInputShipController& playerInput = ecs.addCompInputShipController(playerEid);
     CPlayerShipMovement& playerMovt = ecs.addCompPlayerShipMovement(playerEid);
+    CShipWeapon& playerWeapon = ecs.addCompShipWeapon(playerEid);
+
     playerTf.pos = {10, 10, 0};
     playerTf.scale = {0.5f, 0.5f, 0.5f};
 
@@ -275,6 +277,9 @@ bool GameData::init()
     quat rotZ;
     bx::quatRotateZ(rotZ, -bx::kPiHalf);
     bx::quatMul(playerMesh.tf.rot, baseRot, rotZ);
+
+    playerWeapon.dmgTeam = DamageWorld::PLAYER;
+    playerWeapon.rateOfFire = 10;
     // --------------------
 
 
@@ -387,26 +392,6 @@ void GameData::update(f64 delta)
 
     ecs.update(delta, physLerpAlpha);
     ecs.removeFlaggedForDeletion();
-
-    // TODO: reimplement
-    /*static f64 fireCd = 0;
-    fireCd -= delta;
-    if(fireCd <= 0.0 && playerShip.input.fire) {
-        fireCd = 0.1;
-
-        // bullet entity
-        const i32 eid = ecs.createEntity();
-        ecs.addCompTransform(eid);
-        CBulletMovement& bm = ecs.addCompBulletMovement(eid);
-        CDmgZone& dmgBody = ecs.addCompDmgZone(eid);
-
-        Collider bulletCol;
-        bulletCol.makeCb(CircleBound{vec2{0, 0}, 0.7f});
-        dmgBody.collider = bulletCol;
-        dmgBody.team = DamageWorld::PLAYER;
-        bm.pos = vec3ToVec2(playerShip.tf->pos);
-        bm.vel = vec2Norm(vec3ToVec2(playerShip.mousePosWorld - playerShip.tf->pos)) * 60.0f;
-    }*/
 
     dmgWorld.clearZones();
 

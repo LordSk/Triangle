@@ -25,7 +25,7 @@ struct EntityComponentSystem
     void removeFlaggedForDeletion();
 
 #define ADD_FUNC(COMP)\
-    inline auto& addComp##COMP(const i32 eid) {\
+    inline C##COMP& addComp##COMP(const i32 eid) {\
         assert(eid >= 0 && eid < MAX_ENTITIES);\
         entityCompBits[eid] |= ComponentBit::COMP;\
         return comp_##COMP.emplace(eid, {});\
@@ -36,7 +36,7 @@ struct EntityComponentSystem
 #undef ADD_FUNC
 
 #define GETTER_FUNC(COMP)\
-inline auto& getComp##COMP(const i32 eid) {\
+inline C##COMP& getComp##COMP(const i32 eid) {\
     assert(eid >= 0 && eid < MAX_ENTITIES);\
     assert(entityCompBits[eid] & ComponentBit::COMP);\
     return comp_##COMP[eid];\

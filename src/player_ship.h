@@ -13,7 +13,21 @@ struct CPlayerShipMovement
     vec3 curXyPlanePos;
 };
 
+//@Component
+struct CShipWeapon
+{
+    f32 rateOfFire = 2.0f; // bullets per second
+    f32 fireCd = 0.0f;
+    i32 dmgTeam = 0;
+    //
+};
+
 void updatePlayerShipMovement(struct EntityComponentSystem* ecs, CPlayerShipMovement* eltList,
                                const i32 count, const i32* entityId, f64 delta, f64 physLerpAlpha);
 void onDeletePlayerShipMovement(struct EntityComponentSystem* ecs, CPlayerShipMovement* eltList,
+                                 const i32 count,const i32* entityId, bool8* entDeleteFlag);
+
+void updateShipWeapon(struct EntityComponentSystem* ecs, CShipWeapon* eltList,
+                               const i32 count, const i32* entityId, f64 delta, f64 physLerpAlpha);
+void onDeleteShipWeapon(struct EntityComponentSystem* ecs, CShipWeapon* eltList,
                                  const i32 count,const i32* entityId, bool8* entDeleteFlag);

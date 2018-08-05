@@ -163,10 +163,10 @@ i32 run()
 
 void handleEvent(const SDL_Event& event)
 {
-    inputRecorderHandleEvent(event);
     game.handlEvent(event);
 
     if(mouseCaptured) {
+        inputRecorderHandleEvent(event);
     }
     else {
         imguiHandleSDLEvent(event);

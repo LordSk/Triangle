@@ -4,6 +4,7 @@
 #include "input_recorder.h"
 #include "ecs.h"
 #include "renderer.h"
+#include "game.h" // Damage* stuff, TODO: remove
 
 static vec3 screenToXyPlanePos(const mat4& invViewProj, vec2 screenPos, vec3 camPos)
 {
@@ -115,4 +116,46 @@ void onDeletePlayerShipMovement(EntityComponentSystem* ecs, CPlayerShipMovement*
                                 const i32 count, const i32* entityId, bool8* entDeleteFlag)
 {
 
+}
+
+void updateShipWeapon(EntityComponentSystem* ecs, CShipWeapon* eltList, const i32 count,
+                      const i32* entityId, f64 delta, f64 physLerpAlpha)
+{
+    for(i32 i = 0; i < count; i++) {
+        CShipWeapon& weap = eltList[i];
+        const i32 eid = entityId[i];
+
+        assert(ecs->entityCompBits[eid] & ComponentBit::Transform);
+        assert(ecs->entityCompBits[eid] & ComponentBit::InputShipController);
+
+        const bool8 inputFire = ecs->getCompInputShipController(eid).fire;
+
+        weap.fireCd -= delta;
+        if(weap.fireCd <= 0.0 && inputFire) {
+            weap.fireCd = 1.0f / weap.rateOfFire;
+
+            CTransform& tf = ecs->getCompTransform(eid);
+
+            // bullet entity
+            const i32 eid = ecs->createEntity();
+            ecs->addCompTransform(eid);
+            CBulletMovement& bm = ecs->addCompBulletMovement(eid);
+            CDmgZone& dmgBody = ecs->addCompDmgZone(eid);
+
+            Collider bulletCol;
+            bulletCol.makeCb(CircleBound{vec2{0, 0}, 0.7f});
+            dmgBody.collider = bulletCol;
+            dmgBody.team = DamageWorld::PLAYER;
+            bm.pos = vec3ToVec2(tf.pos);
+            vec3 dx1 = {1, 0, 0};
+            bx::vec3MulQuat(dx1, dx1, tf.rot);
+            vec2 dir = vec2Norm(vec3ToVec2(dx1));
+            bm.vel = dir * 60.0f;
+        }
+    }
+}
+
+void onDeleteShipWeapon(EntityComponentSystem* ecs, CShipWeapon* eltList, const i32 count,
+                        const i32* entityId, bool8* entDeleteFlag)
+{
 }
