@@ -127,12 +127,19 @@ void updateBulletMovement(EntityComponentSystem* ecs, CBulletMovement* eltList, 
     }
 }
 
-void updateInputShipController(EntityComponentSystem* ecs, CInputShipController* eltList, const i32 count,
+void updateShipInput(EntityComponentSystem* ecs, CShipInput* eltList, const i32 count,
+                               const i32* entityId, f64 delta, f64 physLerpAlpha)
+{
+}
+
+void updateShipControllerHuman(EntityComponentSystem* ecs, CShipControllerHuman* eltList, const i32 count,
                                const i32* entityId, f64 delta, f64 physLerpAlpha)
 {
     // TODO: could be optimized...
     for(i32 i = 0; i < count; i++) {
-        CInputShipController& isc = eltList[i];
+        const i32 eid = entityId[i];
+        assert(ecs->entityCompBits[eid] & ComponentBit::ShipInput);
+        CShipInput& isc = ecs->getCompShipInput(eid);
         isc.up = inputIsKeyPressed(Vkey::Up);
         isc.down = inputIsKeyPressed(Vkey::Down);
         isc.left = inputIsKeyPressed(Vkey::Left);
@@ -142,11 +149,20 @@ void updateInputShipController(EntityComponentSystem* ecs, CInputShipController*
     }
 }
 
+void updateShipControllerAi(EntityComponentSystem* ecs, CShipControllerAi* eltList, const i32 count,
+                            const i32* entityId, f64 delta, f64 physLerpAlpha)
+{
+    for(i32 i = 0; i < count; i++) {
+        const i32 eid = entityId[i];
+        assert(ecs->entityCompBits[eid] & ComponentBit::ShipInput);
+        CShipInput& isc = ecs->getCompShipInput(eid);
+        isc.fire = true;
+    }
+}
 
 void onDeleteTransform(EntityComponentSystem* ecs, CTransform* eltList, const i32 count,
                        const i32* entityId, bool8* entDeleteFlag)
 {
-
 }
 
 void onDeletePhysBody(EntityComponentSystem* ecs, CPhysBody* eltList, const i32 count,
@@ -164,29 +180,33 @@ void onDeletePhysBody(EntityComponentSystem* ecs, CPhysBody* eltList, const i32 
 void onDeleteDmgZone(EntityComponentSystem* ecs, CDmgZone* eltList, const i32 count,
                      const i32* entityId, bool8* entDeleteFlag)
 {
-
 }
 
 void onDeleteAiBasicEnemy(EntityComponentSystem* ecs, CAiBasicEnemy* eltList, const i32 count
                           ,const i32* entityId, bool8* entDeleteFlag)
 {
-
 }
 
 void onDeleteDrawMesh(EntityComponentSystem* ecs, CDrawMesh* eltList, const i32 count,
                      const i32* entityId, bool8* entDeleteFlag)
 {
-
 }
 
 void onDeleteBulletMovement(EntityComponentSystem* ecs, CBulletMovement* eltList, const i32 count,
                            const i32* entityId, bool8* entDeleteFlag)
 {
-
 }
 
-void onDeleteInputShipController(EntityComponentSystem* ecs, CInputShipController* eltList, const i32 count,
+void onDeleteShipInput(EntityComponentSystem* ecs, CShipInput* eltList, const i32 count,
                                 const i32* entityId, bool8* entDeleteFlag)
 {
+}
 
+void onDeleteShipControllerHuman(EntityComponentSystem* ecs, CShipControllerHuman* eltList, const i32 count, const i32* entityId, bool8* entDeleteFlag)
+{
+}
+
+void onDeleteShipControllerAi(EntityComponentSystem* ecs, CShipControllerAi* eltList, const i32 count,
+                              const i32* entityId, bool8* entDeleteFlag)
+{
 }

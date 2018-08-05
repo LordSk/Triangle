@@ -47,12 +47,12 @@ void updatePlayerShipMovement(EntityComponentSystem* ecs, CPlayerShipMovement* e
         const i32 eid = entityId[i];
         assert(ecs->entityCompBits[eid] & ComponentBit::Transform);
         assert(ecs->entityCompBits[eid] & ComponentBit::PhysBody);
-        assert(ecs->entityCompBits[eid] & ComponentBit::InputShipController);
+        assert(ecs->entityCompBits[eid] & ComponentBit::ShipInput);
 
         CTransform& tf = ecs->getCompTransform(eid);
         CPhysBody& cpb = ecs->getCompPhysBody(eid);
         PhysBody& physBody = cpb.world->bodyDyn[cpb.bodyId];
-        CInputShipController& input = ecs->getCompInputShipController(eid);
+        CShipInput& input = ecs->getCompShipInput(eid);
 
         // compute mouse xy plane position
         // TODO: move this probably
@@ -126,9 +126,9 @@ void updateShipWeapon(EntityComponentSystem* ecs, CShipWeapon* eltList, const i3
         const i32 eid = entityId[i];
 
         assert(ecs->entityCompBits[eid] & ComponentBit::Transform);
-        assert(ecs->entityCompBits[eid] & ComponentBit::InputShipController);
+        assert(ecs->entityCompBits[eid] & ComponentBit::ShipInput);
 
-        const bool8 inputFire = ecs->getCompInputShipController(eid).fire;
+        const bool8 inputFire = ecs->getCompShipInput(eid).fire;
 
         weap.fireCd -= delta;
         if(weap.fireCd <= 0.0 && inputFire) {
@@ -145,11 +145,15 @@ void updateShipWeapon(EntityComponentSystem* ecs, CShipWeapon* eltList, const i3
             Collider bulletCol;
             bulletCol.makeCb(CircleBound{vec2{0, 0}, 0.7f});
             dmgBody.collider = bulletCol;
-            dmgBody.team = DamageWorld::PLAYER;
+            dmgBody.team = weap.dmgTeam;
             bm.pos = vec3ToVec2(tf.pos);
+
+            // hacky to get direction
+            // TODO: do better
             vec3 dx1 = {1, 0, 0};
             bx::vec3MulQuat(dx1, dx1, tf.rot);
-            vec2 dir = vec2Norm(vec3ToVec2(dx1));
+            const vec2 dir = vec2Norm(vec3ToVec2(dx1));
+
             bm.vel = dir * 60.0f;
         }
     }

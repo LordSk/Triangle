@@ -46,7 +46,7 @@ struct CBulletMovement
 };
 
 //@Component
-struct CInputShipController
+struct CShipInput
 {
     bool8 left;
     bool8 right;
@@ -55,6 +55,18 @@ struct CInputShipController
     bool8 fire;
     f32 mouseX;
     f32 mouseY;
+};
+
+//@Component
+struct CShipControllerHuman
+{
+    // depends: CShipInput
+};
+
+//@Component
+struct CShipControllerAi
+{
+    // depends: CShipInput
 };
 
 void updateTransform(struct EntityComponentSystem* ecs, CTransform* eltList, const i32 count,const i32* entityId,
@@ -69,7 +81,11 @@ void updateDrawMesh(struct EntityComponentSystem* ecs, CDrawMesh* eltList, const
                    const i32* entityId, f64 delta, f64 physLerpAlpha);
 void updateBulletMovement(struct EntityComponentSystem* ecs, CBulletMovement* eltList, const i32 count,
                    const i32* entityId, f64 delta, f64 physLerpAlpha);
-void updateInputShipController(struct EntityComponentSystem* ecs, CInputShipController* eltList,
+void updateShipInput(struct EntityComponentSystem* ecs, CShipInput* eltList,
+                     const i32 count, const i32* entityId, f64 delta, f64 physLerpAlpha);
+void updateShipControllerHuman(struct EntityComponentSystem* ecs, CShipControllerHuman* eltList,
+                               const i32 count, const i32* entityId, f64 delta, f64 physLerpAlpha);
+void updateShipControllerAi(struct EntityComponentSystem* ecs, CShipControllerAi* eltList,
                                const i32 count, const i32* entityId, f64 delta, f64 physLerpAlpha);
 
 void onDeleteTransform(struct EntityComponentSystem* ecs, CTransform* eltList, const i32 count,
@@ -84,5 +100,9 @@ void onDeleteDrawMesh(struct EntityComponentSystem* ecs, CDrawMesh* eltList, con
                       const i32* entityId, bool8* entDeleteFlag);
 void onDeleteBulletMovement(struct EntityComponentSystem* ecs, CBulletMovement* eltList, const i32 count,
                       const i32* entityId, bool8* entDeleteFlag);
-void onDeleteInputShipController(struct EntityComponentSystem* ecs, CInputShipController* eltList,
-                            const i32 count,const i32* entityId, bool8* entDeleteFlag);
+void onDeleteShipInput(struct EntityComponentSystem* ecs, CShipInput* eltList,
+                       const i32 count,const i32* entityId, bool8* entDeleteFlag);
+void onDeleteShipControllerHuman(struct EntityComponentSystem* ecs, CShipControllerHuman* eltList,
+                                 const i32 count,const i32* entityId, bool8* entDeleteFlag);
+void onDeleteShipControllerAi(struct EntityComponentSystem* ecs, CShipControllerAi* eltList,
+                              const i32 count,const i32* entityId, bool8* entDeleteFlag);

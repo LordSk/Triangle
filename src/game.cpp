@@ -249,7 +249,8 @@ bool GameData::init()
     CPhysBody& playerPhysBody = ecs.addCompPhysBody(playerEid);
     CDmgZone& playerDmgBody = ecs.addCompDmgZone(playerEid);
     CDrawMesh& playerMesh = ecs.addCompDrawMesh(playerEid);
-    CInputShipController& playerInput = ecs.addCompInputShipController(playerEid);
+    CShipInput& playerInput = ecs.addCompShipInput(playerEid);
+    CShipControllerHuman& playerController = ecs.addCompShipControllerHuman(playerEid);
     CPlayerShipMovement& playerMovt = ecs.addCompPlayerShipMovement(playerEid);
     CShipWeapon& playerWeapon = ecs.addCompShipWeapon(playerEid);
 
@@ -291,6 +292,9 @@ bool GameData::init()
         CDmgZone& dmgBody = ecs.addCompDmgZone(eid);
         CAiBasicEnemy& ai = ecs.addCompAiBasicEnemy(eid);
         CDrawMesh& mesh = ecs.addCompDrawMesh(eid);
+        ecs.addCompShipInput(eid);
+        ecs.addCompShipControllerAi(eid);
+        CShipWeapon& weap = ecs.addCompShipWeapon(eid);
 
         tf.pos = vec3{ (f32)randRange(10, room.size.x-10), (f32)randRange(10, room.size.y-10), 0 };
         tf.scale = vec3Splat(1.5);
@@ -318,6 +322,9 @@ bool GameData::init()
         quat rotZ;
         bx::quatRotateZ(rotZ, -bx::kPiHalf);
         bx::quatMul(mesh.tf.rot, baseRot, rotZ);
+
+        weap.rateOfFire = 3.0f;
+        weap.dmgTeam = DamageWorld::ENEMY;
     }
 
     return true;
