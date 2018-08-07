@@ -88,6 +88,7 @@ struct GameData
 
     MeshHandle meshPlayerShip;
     MeshHandle meshEyeEn1;
+    MeshHandle meshBullet1;
 
     EntityComponentSystem ecs;
 

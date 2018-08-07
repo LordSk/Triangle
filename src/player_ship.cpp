@@ -152,6 +152,7 @@ void updateShipWeapon(EntityComponentSystem* ecs, CShipWeapon* eltList, const i3
         CShipWeapon& weap = eltList[i];
         const i32 eid = entityId[i];
 
+        assert(weap.hMeshBullet != MESH_HANDLE_INVALID);
         assert(ecs->entityCompBits[eid] & ComponentBit::Transform);
         assert(ecs->entityCompBits[eid] & ComponentBit::ShipInput);
 
@@ -166,11 +167,13 @@ void updateShipWeapon(EntityComponentSystem* ecs, CShipWeapon* eltList, const i3
             CTransform& bulletTf = ecs->addCompTransform(bid);
             CBulletMovement& bm = ecs->addCompBulletMovement(bid);
             CDmgZone& dmgBody = ecs->addCompDmgZone(bid);
+            CDrawMesh& meshComp = ecs->addCompDrawMesh(bid);
 
             CTransform& weapTf = ecs->getCompTransform(eid); // Note: re-get the component since we added
             // a Transform and then might have realloced ArraySparse data
 
             bulletTf.pos = weapTf.pos;
+            bulletTf.rot = weapTf.rot;
 
             Collider bulletCol;
             bulletCol.makeCb(CircleBound{{}, 0.7f});
@@ -186,6 +189,16 @@ void updateShipWeapon(EntityComponentSystem* ecs, CShipWeapon* eltList, const i3
             bm.vel = dir * 60.0f;
             assert(bm.vel.x == bm.vel.x);
             assert(bm.vel.y == bm.vel.y);
+
+            meshComp.hMesh = weap.hMeshBullet;
+            meshComp.color = weap.meshColor;
+
+            quat baseRot;
+            bx::quatRotateX(baseRot, -bx::kPiHalf);
+            quat rotZ;
+            bx::quatRotateZ(rotZ, -bx::kPiHalf);
+            bx::quatMul(meshComp.tf.rot, baseRot, rotZ);
+            meshComp.tf.scale = vec3Splat(0.5);
         }
     }
 }

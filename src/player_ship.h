@@ -19,7 +19,10 @@ struct CShipWeapon
     f32 rateOfFire = 2.0f; // bullets per second
     f32 fireCd = 0.0f;
     i32 dmgTeam = 0;
+
     //
+    MeshHandle hMeshBullet = MESH_HANDLE_INVALID;
+    vec4 meshColor = vec4{1, 1, 1, 1};
 };
 
 void updatePlayerShipMovement(struct EntityComponentSystem* ecs, CPlayerShipMovement* eltList,

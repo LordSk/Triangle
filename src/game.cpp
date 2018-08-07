@@ -147,6 +147,10 @@ bool GameData::init()
         return false;
     }
 
+    if(!(meshBullet1 = meshLoad("assets/bullet_1.mesh", &g_fileReader))) {
+        return false;
+    }
+
     room.make(vec3{100, 50, 10}, 4);
     room.tfRoom.pos.z = 3;
 
@@ -182,6 +186,8 @@ bool GameData::init()
 
     playerWeapon.dmgTeam = DamageTeam::PLAYER;
     playerWeapon.rateOfFire = 10;
+    playerWeapon.hMeshBullet = meshBullet1;
+    playerWeapon.meshColor = vec4{1, 0, 0, 1};
     // --------------------
 
 
@@ -219,6 +225,8 @@ bool GameData::init()
 
         weap.rateOfFire = 2.0f;
         weap.dmgTeam = DamageTeam::ENEMY;
+        weap.hMeshBullet = meshBullet1;
+        weap.meshColor = mesh.color;
     }
 
     return true;
