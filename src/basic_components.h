@@ -12,8 +12,21 @@ struct CTransform : Transform
 //@Component
 struct CPhysBody
 {
-    struct PhysWorld* world = nullptr;
     i32 bodyId = -1;
+
+    inline void makeCircleBody(const vec2& pos, f32 radius, f32 weight, f32 bounceStr) {
+        PhysBody body{};
+        Collider collider;
+        collider.makeCb(CircleBound{ pos, radius });
+        body.pos = pos;
+        body.weight = weight;
+        body.bounceStrength = bounceStr;
+        getPhysWorld().addDynamicBody(collider, body, &bodyId);
+    }
+
+    inline PhysBody& getActualBody() {
+        return getPhysWorld().bodyDyn[bodyId];
+    }
 };
 
 //@Component
@@ -24,7 +37,7 @@ struct CDmgZone
     Collider collider;
     i32 tag = 0;
     void* userData = nullptr;
-    ArraySlice<DamageWorld::IntersectInfo> lastFrameInterList = {};
+    ArraySlice<DamageFrame::IntersectInfo> lastFrameInterList = {};
 };
 
 //@Component

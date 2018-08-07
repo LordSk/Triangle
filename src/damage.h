@@ -12,7 +12,7 @@ struct DamageTeam
     };
 };
 
-struct DamageWorld
+struct DamageFrame
 {
     struct ZoneInfo {
         u32 _cid; // do not set this variable
@@ -34,7 +34,7 @@ struct DamageWorld
     Array<ZoneInfo> zoneInfos[DamageTeam::_COUNT];
     Array<IntersectInfo> intersectList;
 
-    DamageWorld();
+    DamageFrame();
     // done post physical world update
     void registerZone(const DamageTeam::Enum team, Collider c, ZoneInfo zoneInfo);
     void clearZones();
@@ -42,5 +42,5 @@ struct DamageWorld
     void dbgDraw();
 };
 
-void dmgWorldInit();
-DamageWorld& getDmgWorld();
+void dmgFrameInit();
+DamageFrame& getDmgFrame();

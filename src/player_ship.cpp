@@ -41,6 +41,7 @@ void updatePlayerShipMovement(EntityComponentSystem* ecs, CPlayerShipMovement* e
                               const i32* entityId, f64 delta, f64 physLerpAlpha)
 {
     Renderer& rdr = getRenderer();
+    PhysWorld& physWorld = getPhysWorld();
 
     for(i32 i = 0; i < count; i++) {
         CPlayerShipMovement& psm = eltList[i];
@@ -51,7 +52,7 @@ void updatePlayerShipMovement(EntityComponentSystem* ecs, CPlayerShipMovement* e
 
         CTransform& tf = ecs->getCompTransform(eid);
         CPhysBody& cpb = ecs->getCompPhysBody(eid);
-        PhysBody& physBody = cpb.world->bodyDyn[cpb.bodyId];
+        PhysBody& physBody = physWorld.bodyDyn[cpb.bodyId];
         CShipInput& input = ecs->getCompShipInput(eid);
 
         // compute mouse xy plane position
@@ -120,7 +121,7 @@ void updatePlayerShipMovement(EntityComponentSystem* ecs, CPlayerShipMovement* e
         assert(ecs->entityCompBits[eid] & ComponentBit::DmgZone);
         CDmgZone& dmgZone = ecs->getCompDmgZone(eid);
         CPhysBody& cpb = ecs->getCompPhysBody(eid);
-        PhysBody& physBody = cpb.world->bodyDyn[cpb.bodyId];
+        PhysBody& physBody = physWorld.bodyDyn[cpb.bodyId];
 
         const i32 interCount = dmgZone.lastFrameInterList.count;
         if(interCount) {

@@ -70,11 +70,8 @@ struct Room
     vec3 size;
     Array<Transform> cubeTransforms;
     Array<mat4> cubeTfMtx;
-    PhysWorld physWorld; // TODO: move this out
 
     void make(vec3 size_, const i32 cubeSize);
-
-    void dbgDrawPhysWorld();
 };
 
 struct GameData

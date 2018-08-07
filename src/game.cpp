@@ -60,6 +60,7 @@ void CameraFreeFlight::handleEvent(const SDL_Event& event)
 
 void Room::make(vec3 size_, const i32 cubeSize)
 {
+    PhysWorld& physWorld = getPhysWorld();
     i32 sizexi = bx::ceil(size_.x);
     i32 sizeyi = bx::ceil(size_.y);
     size.x = sizexi + (cubeSize - (sizexi % cubeSize));
@@ -133,14 +134,10 @@ void Room::make(vec3 size_, const i32 cubeSize)
     physWorld.addStaticCollider(colWall.makeObb(obbWall));
 }
 
-void Room::dbgDrawPhysWorld()
-{
-    physWorld.dbgDraw(tfRoom.pos);
-}
-
 bool GameData::init()
 {
-    dmgWorldInit();
+    physWorldInit();
+    dmgFrameInit();
 
     if(!(meshPlayerShip = meshLoad("assets/player_ship.mesh", &g_fileReader))) {
         return false;
@@ -167,15 +164,9 @@ bool GameData::init()
     playerTf.pos = {10, 10, 0};
     playerTf.scale = {0.5f, 0.5f, 0.5f};
 
-    PhysBody body{};
-    Collider colPlayer;
-    colPlayer.makeCb(CircleBound{ vec2{0, 0}, 1.2f });
-    body.pos = vec2{ 10, 10 };
-    body.weight = 1.0;
-    body.bounceStrength = 0.0;
-    room.physWorld.addDynamicBody(colPlayer, body, &playerPhysBody.bodyId);
-    playerPhysBody.world = &room.physWorld;
+    playerPhysBody.makeCircleBody(vec2{10, 10}, 1.2f, 1.0, 0.0);
 
+    Collider colPlayer;
     colPlayer.makeCb(CircleBound{ vec2{0, 0}, 1.0f });
     playerDmgBody.collider = colPlayer;
     playerDmgBody.team = DamageTeam::PLAYER;
@@ -209,15 +200,11 @@ bool GameData::init()
         tf.pos = vec3{ (f32)randRange(10, room.size.x-10), (f32)randRange(10, room.size.y-10), 0 };
         tf.scale = vec3Splat(1.5);
 
-        PhysBody body{};
-        Collider collider;
-        collider.makeCb(CircleBound{ vec2{0, 0}, 1.5f });
-        body.pos = vec3ToVec2(tf.pos);
-        body.weight = 1.0;
-        body.bounceStrength = 0.0;
-        room.physWorld.addDynamicBody(collider, body, &physBody.bodyId);
-        physBody.world = &room.physWorld;
 
+        physBody.makeCircleBody(vec3ToVec2(tf.pos), 1.5f, 1.0, 0.0);
+
+        Collider collider;
+        collider.makeCb(CircleBound{{}, 1.5f});
         dmgBody.collider = collider;
         dmgBody.team = DamageTeam::ENEMY;
 
@@ -286,12 +273,14 @@ void GameData::update(f64 delta)
     Renderer& rdr = getRenderer();
     time += delta;
 
+    PhysWorld& physWorld = getPhysWorld();
+
     physWorldTimeAcc += delta;
     if(physWorldTimeAcc >= PHYS_UPDATE_DELTA) {
 #ifdef CONF_DEBUG
-        room.physWorld.update(PHYS_UPDATE_DELTA, 2);
+        physWorld.update(PHYS_UPDATE_DELTA, 2);
 #else
-        room.physWorld.update(PHYS_UPDATE_DELTA, 10);
+        physWorld.update(PHYS_UPDATE_DELTA, 10);
 #endif
         physWorldTimeAcc = 0;
     }
@@ -320,7 +309,7 @@ void GameData::update(f64 delta)
 
     rdr.setView(mtxProj, mtxView);
 
-    DamageWorld& dmgWorld = getDmgWorld();
+    DamageFrame& dmgWorld = getDmgFrame();
     dmgWorld.clearZones();
 
     ecs.removeFlaggedForDeletion();
@@ -412,6 +401,6 @@ void GameData::render()
     }
 
     if(rdr.dbgEnableDbgPhysics) {
-        room.dbgDrawPhysWorld();
+        getPhysWorld().dbgDraw({0, 0, 0});
     }
 }

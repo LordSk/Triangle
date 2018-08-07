@@ -11,9 +11,11 @@ void updateTransform(EntityComponentSystem* ecs, CTransform* eltList, const i32 
 void updatePhysBody(EntityComponentSystem* ecs, CPhysBody* eltList, const i32 count, const i32* entityId,
                     f64 delta, f64 physLerpAlpha)
 {
+    PhysWorld& physWorld = getPhysWorld();
+
     for(i32 i = 0; i < count; i++) {
         const i32 eid = entityId[i];
-        const PhysBody& body = eltList[i].world->bodyDyn[eltList[i].bodyId];
+        const PhysBody& body = physWorld.bodyDyn[eltList[i].bodyId];
         assert(ecs->entityCompBits[eid] & ComponentBit::Transform);
 
         CTransform& tf = ecs->getCompTransform(eid);
@@ -26,7 +28,7 @@ void updatePhysBody(EntityComponentSystem* ecs, CPhysBody* eltList, const i32 co
 void updateDmgZone(EntityComponentSystem* ecs, CDmgZone* eltList, const i32 count, const i32* entityId,
                    f64 delta, f64 physLerpAlpha)
 {
-    DamageWorld& dmgWorld = getDmgWorld();
+    DamageFrame& dmgWorld = getDmgFrame();
 
     for(i32 i = 0; i < count; i++) {
         const i32 eid = entityId[i];
@@ -39,13 +41,13 @@ void updateDmgZone(EntityComponentSystem* ecs, CDmgZone* eltList, const i32 coun
     for(i32 i = 0; i < count; i++) {
         const i32 eid = entityId[i];
         CDmgZone& dmgBody = eltList[i];
-        DamageWorld::ZoneInfo zi;
+        DamageFrame::ZoneInfo zi;
         zi.tag = dmgBody.tag;
         zi.data = (void*)(intptr_t)eid;
         dmgWorld.registerZone((DamageTeam::Enum)dmgBody.team, dmgBody.collider, zi);
     }
 
-    DamageWorld::IntersectInfo* lastFrameInterList = dmgWorld.intersectList.data();
+    DamageFrame::IntersectInfo* lastFrameInterList = dmgWorld.intersectList.data();
     const i32 lastFrameInterCount = dmgWorld.intersectList.count();
 
     for(i32 i = 0; i < count; i++) {
@@ -54,7 +56,7 @@ void updateDmgZone(EntityComponentSystem* ecs, CDmgZone* eltList, const i32 coun
         dmgBody.lastFrameInterList = {};
 
         for(i32 j = 0; j < lastFrameInterCount; j++) {
-            const DamageWorld::IntersectInfo& info = lastFrameInterList[j];
+            const DamageFrame::IntersectInfo& info = lastFrameInterList[j];
             if(info.team1 == dmgBody.team && (intptr_t)info.zone1.data == eid) {
                 if(dmgBody.lastFrameInterList.data == nullptr) {
                     dmgBody.lastFrameInterList.data = &lastFrameInterList[j];
@@ -75,6 +77,7 @@ void updateEnemyBasicMovement(EntityComponentSystem* ecs, CEnemyBasicMovement* e
                         const i32* entityId, f64 delta, f64 physLerpAlpha)
 {
     const vec2 target = {50, 50};
+    PhysWorld& physWorld = getPhysWorld();
 
     for(i32 i = 0; i < count; i++) {
         const i32 eid = entityId[i];
@@ -85,7 +88,7 @@ void updateEnemyBasicMovement(EntityComponentSystem* ecs, CEnemyBasicMovement* e
         CTransform& tf = ecs->getCompTransform(eid);
         CShipInput& input = ecs->getCompShipInput(eid);
         CPhysBody& cpb = ecs->getCompPhysBody(eid);
-        PhysBody& physBody = cpb.world->bodyDyn[cpb.bodyId];
+        PhysBody& physBody = physWorld.bodyDyn[cpb.bodyId];
 
         const vec2 pos2 = vec3ToVec2(tf.pos);
         const vec2 diff = target - pos2;
@@ -237,12 +240,13 @@ void onDeleteTransform(EntityComponentSystem* ecs, CTransform* eltList, const i3
 void onDeletePhysBody(EntityComponentSystem* ecs, CPhysBody* eltList, const i32 count,
                       const i32* entityId, bool8* entDeleteFlag)
 {
+    PhysWorld& physWorld = getPhysWorld();
+
     for(i32 i = 0; i < count; i++) {
         if(!entDeleteFlag[entityId[i]]) continue;
         CPhysBody& pb = eltList[i];
-        assert(pb.world);
         assert(pb.bodyId >= 0);
-        pb.world->removeBodyById(pb.bodyId);
+        physWorld.removeBodyById(pb.bodyId);
     }
 }
 

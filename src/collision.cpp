@@ -436,3 +436,17 @@ void PhysWorld::dbgDraw(vec3 offset)
         colliderDbgDraw(col, vec4{1.0f, 200.f/255.f, 0, 0.5f});
     }
 }
+
+static PhysWorld* g_physWorld = nullptr;
+
+void physWorldInit()
+{
+    static PhysWorld physWorld;
+    g_physWorld = &physWorld;
+}
+
+PhysWorld& getPhysWorld()
+{
+    assert(g_physWorld);
+    return *g_physWorld;
+}

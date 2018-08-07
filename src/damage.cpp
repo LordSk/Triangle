@@ -1,7 +1,7 @@
 #include "damage.h"
 
 
-DamageWorld::DamageWorld()
+DamageFrame::DamageFrame()
 {
     intersectList.reserve(2048);
     for(i32 t = 0; t < (i32)DamageTeam::_COUNT; ++t) {
@@ -10,14 +10,14 @@ DamageWorld::DamageWorld()
     }
 }
 
-void DamageWorld::registerZone(const DamageTeam::Enum team, Collider c, ZoneInfo zoneInfo)
+void DamageFrame::registerZone(const DamageTeam::Enum team, Collider c, ZoneInfo zoneInfo)
 {
     assert(team >= 0 && team < DamageTeam::_COUNT);
     colliders[(i32)team].push(c);
     zoneInfos[(i32)team].push(zoneInfo);
 }
 
-void DamageWorld::clearZones()
+void DamageFrame::clearZones()
 {
     for(i32 t = 0; t < (i32)DamageTeam::_COUNT; ++t) {
         colliders[t].clear();
@@ -25,7 +25,7 @@ void DamageWorld::clearZones()
     }
 }
 
-void DamageWorld::resolveIntersections()
+void DamageFrame::resolveIntersections()
 {
     intersectList.clear();
 
@@ -89,7 +89,7 @@ void DamageWorld::resolveIntersections()
     });
 }
 
-void DamageWorld::dbgDraw()
+void DamageFrame::dbgDraw()
 {
     const vec4 teamColor[] = {
         vec4{1, 1, 1, 0.5f},
@@ -107,16 +107,16 @@ void DamageWorld::dbgDraw()
     }
 }
 
-static DamageWorld* g_dmgWorld = nullptr;
+static DamageFrame* g_dmgFrame = nullptr;
 
-DamageWorld& getDmgWorld()
+DamageFrame& getDmgFrame()
 {
-    assert(g_dmgWorld);
-    return *g_dmgWorld;
+    assert(g_dmgFrame);
+    return *g_dmgFrame;
 }
 
-void dmgWorldInit()
+void dmgFrameInit()
 {
-    static DamageWorld dmg;
-    g_dmgWorld = &dmg;
+    static DamageFrame dmg;
+    g_dmgFrame = &dmg;
 }

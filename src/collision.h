@@ -97,3 +97,6 @@ bool colliderIntersect(const Collider& col1, const Collider& col2, CollisionInfo
 void obbDbgDraw(const OrientedBoundingBox& obb, vec4 color);
 void cbDbgDraw(const CircleBound& cb, vec4 color);
 void colliderDbgDraw(const Collider& col1, vec4 color);
+
+void physWorldInit();
+PhysWorld& getPhysWorld();
