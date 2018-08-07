@@ -137,11 +137,20 @@ i32 run()
             handleEvent(event);
         }
 
-        const i64 t1 = bx::getHPCounter();
-        const i64 frameTime = t1 - t0;
-        t0 = t1;
         const f64 freq = f64(bx::getHPFrequency());
+        i64 t1 = bx::getHPCounter();
+        i64 frameTime = t1 - t0;
         f64 delta = f64(frameTime/freq);
+
+        // limit fps
+        while(delta < 1.0/120.0) {
+            t1 = bx::getHPCounter();
+            frameTime = t1 - t0;
+            delta = f64(frameTime/freq);
+            _mm_pause();
+        }
+
+        t0 = t1;
 
         update(delta);
 

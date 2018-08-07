@@ -110,6 +110,32 @@ void updatePlayerShipMovement(EntityComponentSystem* ecs, CPlayerShipMovement* e
 
         bx::quatRotateZ(tf.rot, angle);
     }
+
+
+    // TODO: move
+    for(i32 i = 0; i < count; i++) {
+        const i32 eid = entityId[i];
+
+        assert(ecs->entityCompBits[eid] & ComponentBit::PhysBody);
+        assert(ecs->entityCompBits[eid] & ComponentBit::DmgZone);
+        CDmgZone& dmgZone = ecs->getCompDmgZone(eid);
+        CPhysBody& cpb = ecs->getCompPhysBody(eid);
+        PhysBody& physBody = cpb.world->bodyDyn[cpb.bodyId];
+
+        const i32 interCount = dmgZone.lastFrameInterList.count;
+        if(interCount) {
+           LOG("PLAYER_INTERSECTIONS: %d", interCount);
+        }
+        for(i32 j = 0; j < interCount; j++) {
+            LOG("+-- %d %lld | %d %lld",
+                dmgZone.lastFrameInterList[j].team1,
+                (intptr_t)dmgZone.lastFrameInterList[j].zone1.data,
+                dmgZone.lastFrameInterList[j].team2,
+                (intptr_t)dmgZone.lastFrameInterList[j].zone2.data
+                );
+            physBody.vel -= vec2Norm(dmgZone.lastFrameInterList[j].collisionInfo.penVec) * 5;
+        }
+    }
 }
 
 void onDeletePlayerShipMovement(EntityComponentSystem* ecs, CPlayerShipMovement* eltList,
@@ -134,27 +160,31 @@ void updateShipWeapon(EntityComponentSystem* ecs, CShipWeapon* eltList, const i3
         if(weap.fireCd <= 0.0 && inputFire) {
             weap.fireCd = 1.0f / weap.rateOfFire;
 
-            CTransform& tf = ecs->getCompTransform(eid);
-
             // bullet entity
-            const i32 eid = ecs->createEntity();
-            ecs->addCompTransform(eid);
-            CBulletMovement& bm = ecs->addCompBulletMovement(eid);
-            CDmgZone& dmgBody = ecs->addCompDmgZone(eid);
+            const i32 bid = ecs->createEntity("Bullet");
+            CTransform& bulletTf = ecs->addCompTransform(bid);
+            CBulletMovement& bm = ecs->addCompBulletMovement(bid);
+            CDmgZone& dmgBody = ecs->addCompDmgZone(bid);
+
+            CTransform& weapTf = ecs->getCompTransform(eid); // Note: re-get the component since we added
+            // a Transform and then might have realloced ArraySparse data
+
+            bulletTf.pos = weapTf.pos;
 
             Collider bulletCol;
-            bulletCol.makeCb(CircleBound{vec2{0, 0}, 0.7f});
+            bulletCol.makeCb(CircleBound{{}, 0.7f});
             dmgBody.collider = bulletCol;
             dmgBody.team = weap.dmgTeam;
-            bm.pos = vec3ToVec2(tf.pos);
 
             // hacky to get direction
             // TODO: do better
             vec3 dx1 = {1, 0, 0};
-            bx::vec3MulQuat(dx1, dx1, tf.rot);
+            bx::vec3MulQuat(dx1, dx1, weapTf.rot);
             const vec2 dir = vec2Norm(vec3ToVec2(dx1));
 
             bm.vel = dir * 60.0f;
+            assert(bm.vel.x == bm.vel.x);
+            assert(bm.vel.y == bm.vel.y);
         }
     }
 }

@@ -9,6 +9,8 @@ struct ComponentBit
         Null = 0,
 %%ENUM_COMPONENT%%
     };
+    
+    static const char* Names[];
 };
 
 #define MAX_ENTITIES 2048
@@ -16,10 +18,12 @@ struct ComponentBit
 struct EntityComponentSystem
 {
     u64 entityCompBits[MAX_ENTITIES] = {};
+    char entityName[MAX_ENTITIES][32];
+    bool8 entityAlive[MAX_ENTITIES] = {0};
     bool8 entityDeleteFlag[MAX_ENTITIES] = {0};
 %%ARRAY_COMPONENT%%
 
-    i32 createEntity();
+    i32 createEntity(const char* name = "Entity");
     void deleteEntity(const i32 eid);
     void update(f64 delta, f64 physLerpAlpha);
     void removeFlaggedForDeletion();

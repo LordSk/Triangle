@@ -2,6 +2,7 @@
 #include "vector_math.h"
 #include "collision.h"
 #include "mesh_load.h"
+#include "damage.h"
 
 //@Component
 struct CTransform : Transform
@@ -21,6 +22,9 @@ struct CDmgZone
     typedef i32 DamageWorldTeam;
     DamageWorldTeam team;
     Collider collider;
+    i32 tag = 0;
+    void* userData = nullptr;
+    ArraySlice<DamageWorld::IntersectInfo> lastFrameInterList = {};
 };
 
 //@Component
@@ -40,7 +44,6 @@ struct CDrawMesh
 //@Component
 struct CBulletMovement
 {
-    vec2 pos;
     vec2 vel;
 };
 

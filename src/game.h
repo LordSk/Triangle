@@ -9,40 +9,6 @@
 #include "mesh_load.h"
 #include "ecs.h"
 
-struct DamageWorld
-{
-    struct ZoneInfo {
-        u32 zid;
-        u32 _cid; // do not set this variable
-        void* data;
-    };
-
-    struct IntersectInfo {
-        i32 team1;
-        i32 team2;
-        ZoneInfo zone1;
-        ZoneInfo zone2;
-    };
-
-    enum Team {
-        NEUTRAL=0,
-        PLAYER,
-        ENEMY,
-        _COUNT
-    };
-
-    // TODO: remove teams? accelerate search with a grid
-    Array<Collider> colliders[Team::_COUNT];
-    Array<ZoneInfo> zoneInfos[Team::_COUNT];
-
-    DamageWorld();
-    // done post physical world update
-    void registerZone(const Team team, Collider c, ZoneInfo zoneInfo);
-    void clearZones();
-    void resolveIntersections(Array<IntersectInfo>* intersectList);
-    void dbgDraw();
-};
-
 struct CameraID {
     enum Enum {
         FREE_VIEW = 0,
@@ -129,14 +95,8 @@ struct GameData
     EntityComponentSystem ecs;
 
     Room room;
-    DamageWorld dmgWorld;
     i32 playerEid = -1;
     i32 weapBulletCount = 0;
-
-    CTransform compTransform[1000];
-    CDmgZone compDmgBody[1000];
-    i32 compTransformCount = 0;
-    i32 compDmgBodyCount = 0;
 
     bool init();
     void deinit();
@@ -144,4 +104,6 @@ struct GameData
     void handlEvent(const SDL_Event& event);
     void update(f64 delta);
     void render();
+
+    void componentDoUi(const i32 eid, const u64 compBit);
 };

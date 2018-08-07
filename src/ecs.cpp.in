@@ -1,9 +1,15 @@
 #include "ecs.h"
 
-i32 EntityComponentSystem::createEntity()
+const char* ComponentBit::Names[] = {
+%%NAMES_COMPONENT%%
+};
+
+i32 EntityComponentSystem::createEntity(const char* name)
 {
     for(i32 i = 0; i < MAX_ENTITIES; ++i) {
-        if(entityCompBits[i] == 0) {
+        if(entityAlive[i] == false) {
+            entityAlive[i] = true;
+            memmove(entityName[i], name, sizeof(entityName[i]));
             return i;
         }
     }
@@ -44,6 +50,7 @@ void EntityComponentSystem::removeFlaggedForDeletion()
             
             compBits = 0;
             entityDeleteFlag[i] = false;
+            entityAlive[i] = false;
         }
     }
 }

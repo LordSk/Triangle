@@ -3,100 +3,8 @@
 #include "renderer.h"
 #include "dbg_draw.h"
 #include "collision.h"
+#include "damage.h"
 #include <imgui/imgui.h>
-
-DamageWorld::DamageWorld()
-{
-    for(i32 t = 0; t < (i32)Team::_COUNT; ++t) {
-        colliders[t].reserve(512);
-        zoneInfos[t].reserve(512);
-    }
-}
-
-void DamageWorld::registerZone(const DamageWorld::Team team, Collider c, ZoneInfo zoneInfo)
-{
-    assert(team >= 0 && team < Team::_COUNT);
-    colliders[(i32)team].push(c);
-    zoneInfos[(i32)team].push(zoneInfo);
-}
-
-void DamageWorld::clearZones()
-{
-    for(i32 t = 0; t < (i32)Team::_COUNT; ++t) {
-        colliders[t].clear();
-        zoneInfos[t].clear();
-    }
-}
-
-void DamageWorld::resolveIntersections(Array<IntersectInfo>* intersectList)
-{
-    intersectList->clear();
-
-    for(i32 t1 = 0; t1 < (i32)Team::_COUNT; ++t1) {
-        const i32 colCount1 = colliders[t1].count();
-        const Collider* colList1 = colliders[t1].data();
-
-        for(i32 t2 = 0; t2 < (i32)Team::_COUNT; ++t2) {
-            if(t1 == t2) continue;
-            const i32 colCount2 = colliders[t2].count();
-            const Collider* colList2 = colliders[t2].data();
-
-            for(i32 c1 = 0; c1 < colCount1; c1++) {
-                const Collider& col1 = colList1[c1];
-
-                for(i32 c2 = 0; c2 < colCount2; c2++) {
-                    const Collider& col2 = colList2[c2];
-
-                    CollisionInfo coliInfo;
-                    if(colliderIntersect(col1, col2, &coliInfo)) {
-                        IntersectInfo intersInfo;
-                        intersInfo.team1 = t1;
-                        intersInfo.team2 = t2;
-                        intersInfo.zone1 = zoneInfos[t1][c1];
-                        intersInfo.zone1._cid = c1;
-                        intersInfo.zone2 = zoneInfos[t2][c2];
-                        intersInfo.zone2._cid = c2;
-                        intersectList->push(intersInfo);
-                    }
-                }
-            }
-        }
-    }
-
-    // remove duplicates
-    qsort(intersectList->data(), intersectList->count(), sizeof(IntersectInfo),
-          [](const void* pa, const void* pb) {
-                const IntersectInfo& a = *(IntersectInfo*)pa;
-                const IntersectInfo& b = *(IntersectInfo*)pb;
-                const u32 minCidA = mmin(a.zone1._cid, a.zone2._cid);
-                const u32 maxCidA = mmax(a.zone1._cid, a.zone2._cid);
-                const u32 minCidB = mmin(b.zone1._cid, b.zone2._cid);
-                const u32 maxCidB = mmax(b.zone1._cid, b.zone2._cid);
-                if(minCidA < minCidB) return -1;
-                if(minCidA > minCidB) return 1;
-                if(maxCidA < maxCidB) return -1;
-                if(maxCidA > maxCidB) return 1;
-                return 0;
-    });
-}
-
-void DamageWorld::dbgDraw()
-{
-    const vec4 teamColor[] = {
-        vec4{1, 1, 1, 0.5f},
-        vec4{0, 1, 0, 0.5f},
-        vec4{1, 0, 0, 0.5f},
-    };
-
-    for(i32 t1 = 0; t1 < (i32)Team::_COUNT; ++t1) {
-        const i32 colCount1 = colliders[t1].count();
-        const Collider* colList1 = colliders[t1].data();
-        for(i32 c1 = 0; c1 < colCount1; c1++) {
-            const Collider& col1 = colList1[c1];
-            colliderDbgDraw(col1, teamColor[t1]);
-        }
-    }
-}
 
 
 // TODO: remove this
@@ -232,6 +140,8 @@ void Room::dbgDrawPhysWorld()
 
 bool GameData::init()
 {
+    dmgWorldInit();
+
     if(!(meshPlayerShip = meshLoad("assets/player_ship.mesh", &g_fileReader))) {
         return false;
     }
@@ -244,7 +154,7 @@ bool GameData::init()
     room.tfRoom.pos.z = 3;
 
     // create player entity
-    playerEid = ecs.createEntity();
+    playerEid = ecs.createEntity("PlayerShip");
     CTransform& playerTf = ecs.addCompTransform(playerEid);
     CPhysBody& playerPhysBody = ecs.addCompPhysBody(playerEid);
     CDmgZone& playerDmgBody = ecs.addCompDmgZone(playerEid);
@@ -268,7 +178,7 @@ bool GameData::init()
 
     colPlayer.makeCb(CircleBound{ vec2{0, 0}, 1.0f });
     playerDmgBody.collider = colPlayer;
-    playerDmgBody.team = DamageWorld::PLAYER;
+    playerDmgBody.team = DamageTeam::PLAYER;
 
     playerMesh.color = {1.0f, 0, 0, 1.0f};
     playerMesh.hMesh = meshPlayerShip;
@@ -279,14 +189,14 @@ bool GameData::init()
     bx::quatRotateZ(rotZ, -bx::kPiHalf);
     bx::quatMul(playerMesh.tf.rot, baseRot, rotZ);
 
-    playerWeapon.dmgTeam = DamageWorld::PLAYER;
+    playerWeapon.dmgTeam = DamageTeam::PLAYER;
     playerWeapon.rateOfFire = 10;
     // --------------------
 
 
     // create basic enemies
-    for(i32 i = 0; i < 15; ++i) {
-        const i32 eid = ecs.createEntity();
+    for(i32 i = 0; i < 20; ++i) {
+        const i32 eid = ecs.createEntity("BasicEnemy");
         CTransform& tf = ecs.addCompTransform(eid);
         CPhysBody& physBody = ecs.addCompPhysBody(eid);
         CDmgZone& dmgBody = ecs.addCompDmgZone(eid);
@@ -309,7 +219,7 @@ bool GameData::init()
         physBody.world = &room.physWorld;
 
         dmgBody.collider = collider;
-        dmgBody.team = DamageWorld::ENEMY;
+        dmgBody.team = DamageTeam::ENEMY;
 
         mesh.color = {(f32)rand01(), (f32)rand01(), (f32)rand01(), 1.0f};
         mesh.hMesh = meshEyeEn1;
@@ -321,7 +231,7 @@ bool GameData::init()
         bx::quatMul(mesh.tf.rot, baseRot, rotZ);
 
         weap.rateOfFire = 2.0f;
-        weap.dmgTeam = DamageWorld::ENEMY;
+        weap.dmgTeam = DamageTeam::ENEMY;
     }
 
     return true;
@@ -351,6 +261,23 @@ void GameData::handlEvent(const SDL_Event& event)
         if(cameraId == CameraID::FREE_VIEW) {
             camFree.handleEvent(event);
         }
+    }
+}
+
+void GameData::componentDoUi(const i32 eid, const u64 compBit)
+{
+    switch(compBit) {
+        case ComponentBit::Transform: {
+            CTransform& tf = ecs.getCompTransform(eid);
+            ImGui::InputFloat3("pos", tf.pos.data);
+            ImGui::InputFloat3("scale", tf.scale.data);
+            ImGui::InputFloat4("rot", tf.rot.data);
+        } break;
+
+        case ComponentBit::BulletMovement: {
+            CBulletMovement& bm = ecs.getCompBulletMovement(eid);
+            ImGui::InputFloat2("vel", bm.vel.data);
+        } break;
     }
 }
 
@@ -393,25 +320,17 @@ void GameData::update(f64 delta)
 
     rdr.setView(mtxProj, mtxView);
 
-
-    ecs.update(delta, physLerpAlpha);
-    ecs.removeFlaggedForDeletion();
-
+    DamageWorld& dmgWorld = getDmgWorld();
     dmgWorld.clearZones();
 
-    for(i32 i = 0; i < ecs.comp_DmgZone.count(); ++i) {
-        const CDmgZone& dmgBody = ecs.comp_DmgZone.data()[i];
-        dmgWorld.registerZone((DamageWorld::Team)dmgBody.team, dmgBody.collider, {});
-    }
+    ecs.removeFlaggedForDeletion();
+    ecs.update(delta, physLerpAlpha);
 
     if(dbgEnableDmgZones) {
        dmgWorld.dbgDraw();
     }
 
-    static Array<DamageWorld::IntersectInfo> intersectList;
-    intersectList.reserve(2048);
-    dmgWorld.resolveIntersections(&intersectList);
-
+    dmgWorld.resolveIntersections();
 
     ImGui::Begin("EntityComponentSystem");
 
@@ -422,6 +341,29 @@ void GameData::update(f64 delta)
 
     ImGui::Text("Entity count (%d/%d):", entityCount, MAX_ENTITIES);
     ImGui::ProgressBar((f32)entityCount/MAX_ENTITIES);
+
+    ImGui::BeginChild("entity_list", ImVec2(-1, 0));
+    for(i32 i = 0; i < MAX_ENTITIES; i++) {
+        const u64 compBits = ecs.entityCompBits[i];
+
+        if(compBits != 0) {
+            char entityStr[64];
+            sprintf(entityStr, "%s %d", ecs.entityName[i], i);
+            if(ImGui::TreeNode(entityStr)) {
+                for(i32 c = 0; c < 64; c++) {
+                    if(compBits & (u64(1) << c)) {
+                        if(ImGui::TreeNode(ComponentBit::Names[c])) {
+                            componentDoUi(i, (u64(1) << c));
+                            ImGui::TreePop();
+                        }
+                    }
+                }
+                ImGui::TreePop();
+            }
+        }
+    }
+    ImGui::EndChild();
+
 
     ImGui::End();
 }

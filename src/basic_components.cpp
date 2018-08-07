@@ -6,17 +6,17 @@
 void updateTransform(EntityComponentSystem* ecs, CTransform* eltList, const i32 count, const i32* entityId,
                      f64 delta, f64 physLerpAlpha)
 {
-
 }
 
 void updatePhysBody(EntityComponentSystem* ecs, CPhysBody* eltList, const i32 count, const i32* entityId,
                     f64 delta, f64 physLerpAlpha)
 {
     for(i32 i = 0; i < count; i++) {
+        const i32 eid = entityId[i];
         const PhysBody& body = eltList[i].world->bodyDyn[eltList[i].bodyId];
-        assert(ecs->entityCompBits[entityId[i]] & ComponentBit::Transform);
+        assert(ecs->entityCompBits[eid] & ComponentBit::Transform);
 
-        CTransform& tf = ecs->getCompTransform(entityId[i]);
+        CTransform& tf = ecs->getCompTransform(eid);
         vec2 pos2 = vec2Lerp(body.prevPos, body.pos, physLerpAlpha);
         tf.pos.x = pos2.x;
         tf.pos.y = pos2.y;
@@ -26,12 +26,48 @@ void updatePhysBody(EntityComponentSystem* ecs, CPhysBody* eltList, const i32 co
 void updateDmgZone(EntityComponentSystem* ecs, CDmgZone* eltList, const i32 count, const i32* entityId,
                    f64 delta, f64 physLerpAlpha)
 {
-    for(i32 i = 0; i < count; i++) {
-        CDmgZone& dmgBody = eltList[i];
-        assert(ecs->entityCompBits[entityId[i]] & ComponentBit::Transform);
+    DamageWorld& dmgWorld = getDmgWorld();
 
-        CTransform& tf = ecs->getCompTransform(entityId[i]);
+    for(i32 i = 0; i < count; i++) {
+        const i32 eid = entityId[i];
+        CDmgZone& dmgBody = eltList[i];
+        assert(ecs->entityCompBits[eid] & ComponentBit::Transform);
+        CTransform& tf = ecs->getCompTransform(eid);
         dmgBody.collider.setPos(vec3ToVec2(tf.pos));
+    }
+
+    for(i32 i = 0; i < count; i++) {
+        const i32 eid = entityId[i];
+        CDmgZone& dmgBody = eltList[i];
+        DamageWorld::ZoneInfo zi;
+        zi.tag = dmgBody.tag;
+        zi.data = (void*)(intptr_t)eid;
+        dmgWorld.registerZone((DamageTeam::Enum)dmgBody.team, dmgBody.collider, zi);
+    }
+
+    DamageWorld::IntersectInfo* lastFrameInterList = dmgWorld.intersectList.data();
+    const i32 lastFrameInterCount = dmgWorld.intersectList.count();
+
+    for(i32 i = 0; i < count; i++) {
+        const i32 eid = entityId[i];
+        CDmgZone& dmgBody = eltList[i];
+        dmgBody.lastFrameInterList = {};
+
+        for(i32 j = 0; j < lastFrameInterCount; j++) {
+            const DamageWorld::IntersectInfo& info = lastFrameInterList[j];
+            if(info.team1 == dmgBody.team && (intptr_t)info.zone1.data == eid) {
+                if(dmgBody.lastFrameInterList.data == nullptr) {
+                    dmgBody.lastFrameInterList.data = &lastFrameInterList[j];
+                    dmgBody.lastFrameInterList.count = 1;
+                }
+                else {
+                    dmgBody.lastFrameInterList.count++;
+                }
+            }
+            else if(dmgBody.lastFrameInterList.data) {
+                break;
+            }
+        }
     }
 }
 
@@ -42,9 +78,9 @@ void updateEnemyBasicMovement(EntityComponentSystem* ecs, CEnemyBasicMovement* e
 
     for(i32 i = 0; i < count; i++) {
         const i32 eid = entityId[i];
-        assert(ecs->entityCompBits[entityId[i]] & ComponentBit::Transform);
-        assert(ecs->entityCompBits[entityId[i]] & ComponentBit::PhysBody);
-        assert(ecs->entityCompBits[entityId[i]] & ComponentBit::ShipInput);
+        assert(ecs->entityCompBits[eid] & ComponentBit::Transform);
+        assert(ecs->entityCompBits[eid] & ComponentBit::PhysBody);
+        assert(ecs->entityCompBits[eid] & ComponentBit::ShipInput);
 
         CTransform& tf = ecs->getCompTransform(eid);
         CShipInput& input = ecs->getCompShipInput(eid);
@@ -98,7 +134,7 @@ void updateBulletMovement(EntityComponentSystem* ecs, CBulletMovement* eltList, 
         const i32 eid = entityId[i];
         assert(ecs->entityCompBits[eid] & ComponentBit::Transform);
         CTransform& tf = ecs->getCompTransform(eid);
-        vec2& bpos = bulletMove.pos;
+        vec2 bpos = vec3ToVec2(tf.pos);
         bpos += bulletMove.vel * delta;
         tf.pos.x = bpos.x;
         tf.pos.y = bpos.y;
@@ -174,6 +210,21 @@ void updateShipControllerAi(EntityComponentSystem* ecs, CShipControllerAi* eltLi
 
             input.up = fwdDir == 1;
             input.down = fwdDir == -1;
+        }
+    }
+
+    for(i32 i = 0; i < count; i++) {
+        const i32 eid = entityId[i];
+
+        assert(ecs->entityCompBits[eid] & ComponentBit::DmgZone);
+        CDmgZone& dmgZone = ecs->getCompDmgZone(eid);
+
+        const i32 interCount = dmgZone.lastFrameInterList.count;
+        if(interCount > 0) {
+            ecs->deleteEntity(eid);
+        }
+        for(i32 j = 0; j < interCount; j++) {
+
         }
     }
 }

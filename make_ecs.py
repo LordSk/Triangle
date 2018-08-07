@@ -38,7 +38,7 @@ for lid, l in enumerate(lines):
     if l == "%%ENUM_COMPONENT%%\n":
         str = ""
         for cid, c in enumerate(components):
-            str += "        %s = (1 << %d),\n" % (c[1:], cid)
+            str += "        %s = (u64(1) << %d),\n" % (c[1:], cid)
         lines[lid] = str
         
     elif l == "%%ARRAY_COMPONENT%%\n":
@@ -65,7 +65,13 @@ ecshContent = "".join(lines)
 lines = f_ecscpp_in.readlines();
 
 for lid, l in enumerate(lines):
-    if l == "%%UPDATE_COMPONENT%%\n":
+    if l == "%%NAMES_COMPONENT%%\n":
+        str = ""
+        for cid, c in enumerate(components):
+            str += "    \"%s\",\n" % (c[1:])
+        lines[lid] = str
+        
+    elif l == "%%UPDATE_COMPONENT%%\n":
         str = ""
         for cid, c in enumerate(components):
             str += "    UPDATE_FUNC(%s);\n" % (c[1:])

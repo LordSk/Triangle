@@ -214,6 +214,19 @@ struct ArraySparse
     }
 };
 
+template<typename T>
+struct ArraySlice
+{
+    T* data = nullptr;
+    i32 count = 0;
+
+    inline T& operator[](const i32 id) {
+        assert(count > 0);
+        assert(id < count);
+        return data[id];
+    }
+};
+
 const bgfx::Memory* loadMem(bx::FileReaderI* _reader, const char* _filePath);
 bgfx::ShaderHandle loadShader(bx::FileReaderI* _reader, const char* _name);
 bgfx::ProgramHandle loadProgram(bx::FileReaderI* _reader, const char* _vsName, const char* _fsName);
