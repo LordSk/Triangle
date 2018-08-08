@@ -9,7 +9,8 @@
 #include "mesh_load.h"
 #include "ecs.h"
 
-struct CameraID {
+struct CameraID
+{
     enum Enum {
         FREE_VIEW = 0,
         PLAYER_VIEW,
@@ -23,12 +24,7 @@ struct CameraBirdView
     vec3 up = {0, 0, 1.f};
     f32 height;
 
-    inline void compute(mat4* lookAt) {
-        bx::vec3Norm(dir, dir);
-        vec3 eye = pos + vec3{0, 0, height};
-        vec3 at = eye + dir;
-        bx::mtxLookAtRh(*lookAt, eye, at, up);
-    }
+    void computeCamera(struct Camera* cam);
 };
 
 struct CameraFreeFlight
@@ -38,6 +34,8 @@ struct CameraFreeFlight
     vec3 up = {0, 0, 1};
     quat rot;
     f32 speed = 30;
+    f64 pitch = 0;
+    f64 yaw = 0;
 
     struct {
         bool8 forward;
@@ -47,9 +45,6 @@ struct CameraFreeFlight
         bool8 up;
         bool8 down;
     } input = {};
-
-    f64 pitch = 0;
-    f64 yaw = 0;
 
     void handleEvent(const SDL_Event& event);
 
@@ -81,7 +76,7 @@ struct GameData
     i32 cameraId = CameraID::PLAYER_VIEW;
 
     bool mouseCaptured = true;
-    CameraFreeFlight camFree;
+    CameraFreeFlight camFreeView;
 
     f32 dbgPlayerCamHeight = 30;
     bool dbgEnableDmgZones = false;

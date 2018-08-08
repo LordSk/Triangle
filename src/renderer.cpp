@@ -107,12 +107,14 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
     renderWidth = renderWidth_;
     renderHeight = renderHeight_;
 
+    cameraList.resize(16);
+
     bgfx::Init init;
     init.type = bgfx::RendererType::Direct3D11;
     init.vendorId = BGFX_PCI_ID_NONE;
     init.deviceId = 0;
-    init.resolution.width  = 1600;
-    init.resolution.height = 900;
+    init.resolution.width  = renderWidth;
+    init.resolution.height = renderHeight;
     init.resolution.reset = BGFX_RESET_NONE;
 
     if(!bgfx::init(init)) {
@@ -354,4 +356,21 @@ void Renderer::drawCubeInstances(const InstanceData* instData, const i32 cubeCou
 
         bgfx::submit(RdrViewID::GAME, progVertShadingColorInstance);
     }
+}
+
+void Renderer::setCamera(const i32 camId, Camera cam)
+{
+    if(camId > cameraList.count()) {
+        cameraList.resize(cameraList.count() * 2);
+        assert(camId < cameraList.count());
+    }
+    cameraList[camId] = cam;
+}
+
+void Renderer::selectCamera(const i32 camId)
+{
+    assert(camId < cameraList.count());
+    currentCamId = camId;
+    const Camera& cam = cameraList[camId];
+    bx::mtxLookAtRh(mtxView, cam.eye, cam.at, cam.up);
 }

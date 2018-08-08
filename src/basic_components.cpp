@@ -157,10 +157,14 @@ void updateShipInput(EntityComponentSystem* ecs, CShipInput* eltList, const i32 
 void updateShipControllerHuman(EntityComponentSystem* ecs, CShipControllerHuman* eltList, const i32 count,
                                const i32* entityId, f64 delta, f64 physLerpAlpha)
 {
+    Renderer& rdr = getRenderer();
+    if(rdr.currentCamId != 1) { // PLAYER_VIEW
+        return;
+    }
+
     // TODO: could be optimized...
     for(i32 i = 0; i < count; i++) {
         const i32 eid = entityId[i];
-        assert(ecs->entityCompBits[eid] & ComponentBit::ShipInput);
         CShipInput& isc = ecs->getCompShipInput(eid);
         isc.up = inputIsKeyPressed(Vkey::Up);
         isc.down = inputIsKeyPressed(Vkey::Down);

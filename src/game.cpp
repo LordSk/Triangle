@@ -6,10 +6,17 @@
 #include "damage.h"
 #include <imgui/imgui.h>
 
-
 // TODO: remove this
 static bx::FileReader g_fileReader;
 static bx::FileWriter g_fileWriter;
+
+void CameraBirdView::computeCamera(Camera* cam)
+{
+    bx::vec3Norm(dir, dir);
+    cam->eye = pos + vec3{0, 0, height};
+    cam->at = cam->eye + dir;
+    cam->up = up;
+}
 
 void CameraFreeFlight::handleEvent(const SDL_Event& event)
 {
@@ -254,7 +261,7 @@ void GameData::handlEvent(const SDL_Event& event)
 
     if(mouseCaptured) {
         if(cameraId == CameraID::FREE_VIEW) {
-            camFree.handleEvent(event);
+            camFreeView.handleEvent(event);
         }
     }
 }
@@ -296,26 +303,35 @@ void GameData::update(f64 delta)
     const f64 physLerpAlpha = physWorldTimeAcc / PHYS_UPDATE_DELTA;
 
     // set camera view
-    mat4 mtxProj, mtxView;
-    const vec3 up = { 0.0f, 0.0f, 1.0f };
+    mat4 mtxProj;
     bx::mtxProjRh(mtxProj, 60.0f, f32(rdr.renderWidth)/f32(rdr.renderHeight), 0.1f, 1000.0f,
                   bgfx::getCaps()->homogeneousDepth);
+    rdr.mtxProj = mtxProj;
+
+    // set cameras
+    if(cameraId == CameraID::FREE_VIEW) {
+        camFreeView.applyInput(delta);
+    }
+
+    Camera _camFreeView;
+    _camFreeView.eye = camFreeView.pos;
+    _camFreeView.at = camFreeView.pos + camFreeView.dir;
+    _camFreeView.up = camFreeView.up;
+    rdr.setCamera(CameraID::FREE_VIEW, _camFreeView);
+
+    Camera _camBirdView;
+    CameraBirdView camBv;
+    camBv.pos = ecs.getCompTransform(playerEid).pos;
+    camBv.height = dbgPlayerCamHeight;
+    camBv.computeCamera(&_camBirdView);
+    rdr.setCamera(CameraID::PLAYER_VIEW, _camBirdView);
 
     if(cameraId == CameraID::FREE_VIEW) {
-        vec3 at;
-        camFree.applyInput(delta);
-
-        bx::vec3Add(at, camFree.pos, camFree.dir);
-        bx::mtxLookAtRh(mtxView, camFree.pos, at, up);
+        rdr.selectCamera(CameraID::FREE_VIEW);
     }
     else if(cameraId == CameraID::PLAYER_VIEW) {
-        CameraBirdView camBv;
-        camBv.pos = ecs.getCompTransform(playerEid).pos;
-        camBv.height = dbgPlayerCamHeight;
-        camBv.compute(&mtxView);
+        rdr.selectCamera(CameraID::PLAYER_VIEW);
     }
-
-    rdr.setView(mtxProj, mtxView);
 
     DamageFrame& dmgWorld = getDmgFrame();
     dmgWorld.clearZones();

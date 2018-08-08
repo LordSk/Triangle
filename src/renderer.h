@@ -2,6 +2,7 @@
 
 #include "vector_math.h"
 #include "mesh_load.h"
+#include "utils.h"
 #include <bgfx/bgfx.h>
 
 // TODO: move this
@@ -56,6 +57,13 @@ struct InstanceData
     vec4 color;
 };
 
+struct Camera
+{
+    vec3 eye = {0, 0, 0};
+    vec3 at = {0, 0.001f, -1.f};
+    vec3 up = {0, 0, 1.f};
+};
+
 struct Renderer
 {
     i32 renderWidth;
@@ -83,6 +91,9 @@ struct Renderer
     mat4 mtxProj;
     mat4 mtxView;
 
+    Array<Camera> cameraList;
+    i32 currentCamId = 0;
+
     bool dbgEnableGrid = true;
     bool dbgEnableWorldOrigin = true;
     bool dbgEnableDbgPhysics = false;
@@ -96,6 +107,9 @@ struct Renderer
 
     void drawMesh(MeshHandle hmesh, const mat4& mtxModel, const vec4& color);
     void drawCubeInstances(const InstanceData* instData, const i32 cubeCount);
+
+    void setCamera(const i32 camId, Camera cam);
+    void selectCamera(const i32 camId);
 };
 
 void setRendererGlobal(Renderer* renderer);

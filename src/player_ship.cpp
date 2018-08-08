@@ -59,7 +59,11 @@ void updatePlayerShipMovement(EntityComponentSystem* ecs, CPlayerShipMovement* e
         // TODO: move this probably
         mat4 invView;
         mat4 viewProj;
-        bx::mtxMul(viewProj, rdr.mtxView, rdr.mtxProj);
+        mat4 mtxPlayerView;
+        const Camera& camPlayerView = rdr.cameraList[CameraID::PLAYER_VIEW];
+        bx::mtxLookAtRh(mtxPlayerView, camPlayerView.eye, camPlayerView.at, camPlayerView.up);
+
+        bx::mtxMul(viewProj, mtxPlayerView, rdr.mtxProj);
         bx::mtxInverse(invView, viewProj);
         const vec2 mousePos = { input.mouseX, input.mouseY };
         const vec3 xyPlanePos = screenToXyPlanePos(invView, mousePos, tf.pos + vec3{0, 0, 30});
@@ -124,16 +128,13 @@ void updatePlayerShipMovement(EntityComponentSystem* ecs, CPlayerShipMovement* e
         PhysBody& physBody = physWorld.bodyDyn[cpb.bodyId];
 
         const i32 interCount = dmgZone.lastFrameInterList.count;
-        if(interCount) {
-           LOG("PLAYER_INTERSECTIONS: %d", interCount);
-        }
         for(i32 j = 0; j < interCount; j++) {
-            LOG("+-- %d %lld | %d %lld",
+            /*LOG("+-- %d %lld | %d %lld",
                 dmgZone.lastFrameInterList[j].team1,
                 (intptr_t)dmgZone.lastFrameInterList[j].zone1.data,
                 dmgZone.lastFrameInterList[j].team2,
                 (intptr_t)dmgZone.lastFrameInterList[j].zone2.data
-                );
+                );*/
             physBody.vel -= vec2Norm(dmgZone.lastFrameInterList[j].collisionInfo.penVec) * 5;
         }
     }
