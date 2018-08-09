@@ -5,6 +5,7 @@
 #include "collision.h"
 #include "damage.h"
 #include <imgui/imgui.h>
+#include <imgui/bgfx_imgui.h>
 
 // TODO: remove this
 static bx::FileReader g_fileReader;
@@ -243,6 +244,7 @@ void GameData::deinit()
 {
     meshUnload(meshPlayerShip);
     meshUnload(meshEyeEn1);
+    meshUnload(meshBullet1);
 }
 
 void GameData::handlEvent(const SDL_Event& event)
@@ -302,6 +304,18 @@ void GameData::update(f64 delta)
 
     const f64 physLerpAlpha = physWorldTimeAcc / PHYS_UPDATE_DELTA;
 
+    DamageFrame& dmgWorld = getDmgFrame();
+    dmgWorld.clearZones();
+
+    ecs.removeFlaggedForDeletion();
+    ecs.update(delta, physLerpAlpha);
+
+    if(dbgEnableDmgZones) {
+       dmgWorld.dbgDraw();
+    }
+
+    dmgWorld.resolveIntersections();
+
     // set camera view
     mat4 mtxProj;
     bx::mtxProjRh(mtxProj, 60.0f, f32(rdr.renderWidth)/f32(rdr.renderHeight), 0.1f, 1000.0f,
@@ -333,52 +347,45 @@ void GameData::update(f64 delta)
         rdr.selectCamera(CameraID::PLAYER_VIEW);
     }
 
-    DamageFrame& dmgWorld = getDmgFrame();
-    dmgWorld.clearZones();
-
-    ecs.removeFlaggedForDeletion();
-    ecs.update(delta, physLerpAlpha);
-
-    if(dbgEnableDmgZones) {
-       dmgWorld.dbgDraw();
-    }
-
-    dmgWorld.resolveIntersections();
-
     ImGui::Begin("EntityComponentSystem");
 
-    i32 entityCount = 0;
-    for(i32 i = 0; i < MAX_ENTITIES; i++) {
-        entityCount += ecs.entityCompBits[i] != 0;
-    }
+        i32 entityCount = 0;
+        for(i32 i = 0; i < MAX_ENTITIES; i++) {
+            entityCount += ecs.entityCompBits[i] != 0;
+        }
 
-    ImGui::Text("Entity count (%d/%d):", entityCount, MAX_ENTITIES);
-    ImGui::ProgressBar((f32)entityCount/MAX_ENTITIES);
+        ImGui::Text("Entity count (%d/%d):", entityCount, MAX_ENTITIES);
+        ImGui::ProgressBar((f32)entityCount/MAX_ENTITIES);
 
-    ImGui::BeginChild("entity_list", ImVec2(-1, 0));
-    for(i32 i = 0; i < MAX_ENTITIES; i++) {
-        const u64 compBits = ecs.entityCompBits[i];
+        ImGui::BeginChild("entity_list", ImVec2(-1, 0));
+        for(i32 i = 0; i < MAX_ENTITIES; i++) {
+            const u64 compBits = ecs.entityCompBits[i];
 
-        if(compBits != 0) {
-            char entityStr[64];
-            sprintf(entityStr, "%s %d", ecs.entityName[i], i);
-            if(ImGui::TreeNode(entityStr)) {
-                for(i32 c = 0; c < 64; c++) {
-                    if(compBits & (u64(1) << c)) {
-                        if(ImGui::TreeNode(ComponentBit::Names[c])) {
-                            componentDoUi(i, (u64(1) << c));
-                            ImGui::TreePop();
+            if(compBits != 0) {
+                char entityStr[64];
+                sprintf(entityStr, "%s %d", ecs.entityName[i], i);
+                if(ImGui::TreeNode(entityStr)) {
+                    for(i32 c = 0; c < 64; c++) {
+                        if(compBits & (u64(1) << c)) {
+                            if(ImGui::TreeNode(ComponentBit::Names[c])) {
+                                componentDoUi(i, (u64(1) << c));
+                                ImGui::TreePop();
+                            }
                         }
                     }
+                    ImGui::TreePop();
                 }
-                ImGui::TreePop();
             }
         }
-    }
-    ImGui::EndChild();
-
+        ImGui::EndChild();
 
     ImGui::End();
+
+    /*ImGui::Begin("Renderer");
+
+    ImGui::Image(rdr.texShadowMap, ImVec2(512, 512));
+
+    ImGui::End();*/
 }
 
 void GameData::render()
@@ -401,7 +408,7 @@ void GameData::render()
         Transform tf = room.cubeTransforms[i];
         mat4 mtx1;
 
-        tf.pos.z = tf.pos.z - sin(time + i*0.21f) * 0.2;
+        //tf.pos.z = tf.pos.z - sin(time + i*0.21f) * 0.2;
 
         // model * roomModel
         tf.toMtx(&mtx1);
@@ -411,7 +418,7 @@ void GameData::render()
         instData[i] = inst;
     }
 
-    rdr.drawCubeInstances(instData.data(), cubeCount);
+    rdr.drawCubeInstances(instData.data(), cubeCount, true);
 #endif
 
     // TODO: temporary

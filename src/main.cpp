@@ -227,7 +227,7 @@ void updateUI(f64 delta)
         }
     }
 
-    imguiBeginFrame(mx, my, buttons, WINDOW_WIDTH, WINDOW_HEIGHT, 0xff, RdrViewID::UI);
+    imguiBeginFrame(mx, my, buttons, WINDOW_WIDTH, WINDOW_HEIGHT, 0xff, 1 /* RdrViewID::UI */);
 
     // ui code here
     //im::ShowDemoWindow();

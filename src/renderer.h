@@ -42,15 +42,6 @@ struct PosUvVertex
     static bgfx::VertexDecl decl;
 };
 
-struct RdrViewID
-{
-    enum {
-        GAME = 0,
-        UI,
-        COMBINE,
-    } Enum;
-};
-
 struct InstanceData
 {
     mat4 mtxModel;
@@ -60,8 +51,8 @@ struct InstanceData
 struct Camera
 {
     vec3 eye = {0, 0, 0};
-    vec3 at = {0, 0.001f, -1.f};
-    vec3 up = {0, 0, 1.f};
+    vec3 at  = {0, 0.001f, -1.f};
+    vec3 up  = {0, 0, 1.f};
 };
 
 struct Renderer
@@ -76,9 +67,12 @@ struct Renderer
     bgfx::ProgramHandle progDbgColor;
     bgfx::ProgramHandle progGameFinal;
     bgfx::ProgramHandle progUiFinal;
+    bgfx::ProgramHandle progShadow;
+    bgfx::ProgramHandle progShadowInstance;
 
     bgfx::UniformHandle u_color;
     bgfx::UniformHandle u_sdiffuse;
+    bgfx::UniformHandle u_depthScaleOffset;
 
     bgfx::VertexBufferHandle cubeVbh;
     bgfx::VertexBufferHandle originVbh;
@@ -87,6 +81,11 @@ struct Renderer
 
     bgfx::FrameBufferHandle fbhGame;
     bgfx::FrameBufferHandle fbhUI;
+    bgfx::FrameBufferHandle fbhShadowMap;
+
+    bgfx::TextureHandle texShadowMap;
+
+    bool8 caps_shadowSamplerSupported;
 
     mat4 mtxProj;
     mat4 mtxView;
@@ -106,7 +105,7 @@ struct Renderer
     void frame();
 
     void drawMesh(MeshHandle hmesh, const mat4& mtxModel, const vec4& color);
-    void drawCubeInstances(const InstanceData* instData, const i32 cubeCount);
+    void drawCubeInstances(const InstanceData* instData, const i32 cubeCount, const bool8 dropShadow);
 
     void setCamera(const i32 camId, Camera cam);
     void selectCamera(const i32 camId);

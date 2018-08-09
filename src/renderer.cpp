@@ -3,6 +3,16 @@
 #include <bgfx/bgfx.h>
 #include <bx/timer.h>
 
+struct ViewID
+{
+    enum Enum {
+        GAME = 0,
+        UI,
+        COMBINE,
+        SHADOW_MAP0,
+    };
+};
+
 // TODO: do not use this
 static bx::FileReader g_fileReader;
 static bx::FileWriter g_fileWriter;
@@ -158,13 +168,17 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
         return false;
     }
 
-    // Set view 0 clear state.
-    bgfx::setViewClear(RdrViewID::GAME, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, 0x101010ff, 1.0f, 0.f);
-    bgfx::setViewClear(RdrViewID::UI, BGFX_CLEAR_COLOR, 0x00000000, 1.f, 0.f);
-    bgfx::setViewClear(RdrViewID::COMBINE, BGFX_CLEAR_COLOR, 0x101010ff, 1.0f, 0.f);
+    // Set view clear state.
+    bgfx::setViewClear(ViewID::GAME, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, 0x101010ff, 1.0f, 0.f);
+    bgfx::setViewClear(ViewID::UI, BGFX_CLEAR_COLOR, 0x00000000, 1.f, 0.f);
+    bgfx::setViewClear(ViewID::COMBINE, BGFX_CLEAR_COLOR, 0x101010ff, 1.0f, 0.f);
 
-    bgfx::setViewFrameBuffer(RdrViewID::GAME, fbhGame);
-    bgfx::setViewFrameBuffer(RdrViewID::UI, fbhUI);
+    bgfx::setViewFrameBuffer(ViewID::GAME, fbhGame);
+    bgfx::setViewFrameBuffer(ViewID::UI, fbhUI);
+
+    bgfx::setViewName(ViewID::GAME, "Game");
+    bgfx::setViewName(ViewID::UI, "ImGui");
+    bgfx::setViewName(ViewID::COMBINE, "Combine");
 
     // Create vertex stream declaration.
     PosColorVertex::init();
@@ -199,6 +213,7 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
     progGameFinal = loadProgram(&g_fileReader, "vs_game_final", "fs_game_final");
     progUiFinal = loadProgram(&g_fileReader, "vs_game_final", "fs_ui_final");
 
+
     i32 i = 0;
     for(i32 x = 0; x < 100; x++) {
         s_gridLinesVertData[i++] = { x * 10.0f, 0, 0 };
@@ -214,6 +229,73 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
             bgfx::makeRef(s_gridLinesVertData, sizeof(s_gridLinesVertData)),
             PosColorVertex::ms_decl
             );
+
+    const bgfx::Caps& caps = *bgfx::getCaps();
+    caps_shadowSamplerSupported = (caps.supported & BGFX_CAPS_TEXTURE_COMPARE_LEQUAL) != 0;
+
+    const i32 shadowMapSize = 2048;
+
+    if(caps_shadowSamplerSupported) {
+        progShadow = loadProgram(&g_fileReader, "vs_shadow_leq", "fs_shadow_leq");
+        progShadowInstance = loadProgram(&g_fileReader, "vs_shadow_leq_instance", "fs_shadow_leq");
+
+        bgfx::TextureHandle fbtextures[] =
+        {
+            bgfx::createTexture2D(shadowMapSize, shadowMapSize, false,
+                1, bgfx::TextureFormat::D16, BGFX_TEXTURE_RT | BGFX_TEXTURE_COMPARE_LEQUAL),
+        };
+        texShadowMap = fbtextures[0];
+        fbhShadowMap = bgfx::createFrameBuffer(BX_COUNTOF(fbtextures), fbtextures, true);
+    }
+    else {
+        LOG("Renderer> shadow samplers are not supported.");
+
+        progShadow = loadProgram(&g_fileReader, "vs_shadow", "fs_shadow");
+        progShadowInstance = loadProgram(&g_fileReader, "vs_shadow_instance", "fs_shadow");
+
+        bgfx::TextureHandle fbtextures[] =
+        {
+            bgfx::createTexture2D(shadowMapSize, shadowMapSize,
+                false, 1, bgfx::TextureFormat::BGRA8, BGFX_TEXTURE_RT),
+
+            bgfx::createTexture2D(shadowMapSize, shadowMapSize,
+                false, 1, bgfx::TextureFormat::D16, BGFX_TEXTURE_RT_WRITE_ONLY),
+        };
+
+        texShadowMap = fbtextures[0];
+        fbhShadowMap = bgfx::createFrameBuffer(BX_COUNTOF(fbtextures), fbtextures, true);
+    }
+
+    if(!bgfx::isValid(fbhShadowMap)) {
+        LOG("ERROR> could not create shadow frame buffer");
+        return false;
+    }
+
+    mat4 mtxLightProj, mtxLightView;
+    Camera camLight;
+    camLight.eye = { 10.0f, 10.0f, 50.0f };
+    camLight.at  = { 10.0f, 10.0f, 0.0f };
+    camLight.up  = { 0, 0, 1 };
+    bx::mtxLookAtRh(mtxLightView, camLight.eye, camLight.at, camLight.up);
+
+    const float area = 30.0f;
+    bx::mtxOrthoRh(mtxLightProj, -area, area, -area, area, -100.0f, 100.0f, 0.0f, caps.homogeneousDepth);
+
+    bgfx::setViewRect(ViewID::SHADOW_MAP0, 0, 0, shadowMapSize, shadowMapSize);
+    bgfx::setViewFrameBuffer(ViewID::SHADOW_MAP0, fbhShadowMap);
+    bgfx::setViewTransform(ViewID::SHADOW_MAP0, mtxLightView, mtxLightProj);
+    bgfx::setViewName(ViewID::SHADOW_MAP0, "ShadowMap0");
+
+    bgfx::setViewClear(ViewID::SHADOW_MAP0, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, 0x303030ff, 1.0f, 0);
+
+    u_depthScaleOffset = bgfx::createUniform("u_depthScaleOffset",  bgfx::UniformType::Vec4);
+
+    f32 depthScaleOffset[4] = { 1.0f, 0.0f, 0.0f, 0.0f };
+    if(caps.homogeneousDepth) {
+        depthScaleOffset[0] = 0.5f;
+        depthScaleOffset[1] = 0.5f;
+    }
+    bgfx::setUniform(u_depthScaleOffset, depthScaleOffset);
 
     return true;
 }
@@ -232,12 +314,16 @@ void Renderer::deinit()
     bgfx::destroy(progDbgColor);
     bgfx::destroy(progGameFinal);
     bgfx::destroy(progUiFinal);
+    bgfx::destroy(progShadow);
+    bgfx::destroy(progShadowInstance);
 
     bgfx::destroy(u_color);
     bgfx::destroy(u_sdiffuse);
+    bgfx::destroy(u_depthScaleOffset);
 
     bgfx::destroy(fbhGame);
     bgfx::destroy(fbhUI);
+    bgfx::destroy(fbhShadowMap);
 
     bgfx::shutdown();
 }
@@ -250,17 +336,29 @@ void Renderer::setView(const mat4& proj, const mat4& view)
 
 void Renderer::frame()
 {
-    bgfx::setViewRect(RdrViewID::GAME, 0, 0, u16(renderWidth), u16(renderHeight));
-    bgfx::setViewRect(RdrViewID::UI, 0, 0, u16(renderWidth), u16(renderHeight));
-    bgfx::setViewRect(RdrViewID::COMBINE, 0, 0, u16(renderWidth), u16(renderHeight));
+    bgfx::setViewRect(ViewID::GAME, 0, 0, u16(renderWidth), u16(renderHeight));
+    bgfx::setViewRect(ViewID::UI, 0, 0, u16(renderWidth), u16(renderHeight));
+    bgfx::setViewRect(ViewID::COMBINE, 0, 0, u16(renderWidth), u16(renderHeight));
 
-    bgfx::setViewTransform(RdrViewID::GAME, mtxView, mtxProj);
+    bgfx::setViewTransform(ViewID::GAME, mtxView, mtxProj);
+
+    // shadow map
+    mat4 mtxLightProj, mtxLightView;
+    Camera camLight = cameraList[currentCamId];
+    bx::mtxLookAtRh(mtxLightView, camLight.eye, camLight.at, camLight.up);
+
+    const bgfx::Caps* caps = bgfx::getCaps();
+    const float area = 30.0f;
+    bx::mtxOrthoRh(mtxLightProj, -area, area, -area, area, -100.0f, 100.0f, 0.0f, caps->homogeneousDepth);
+    bgfx::setViewTransform(ViewID::SHADOW_MAP0, mtxLightView, mtxLightProj);
+
 
     // This dummy draw call is here to make sure that view x is cleared
     // if no other draw calls are submitted to view x.
-    bgfx::touch(RdrViewID::GAME);
-    bgfx::touch(RdrViewID::UI);
-    bgfx::touch(RdrViewID::COMBINE);
+    bgfx::touch(ViewID::SHADOW_MAP0);
+    bgfx::touch(ViewID::GAME);
+    bgfx::touch(ViewID::UI);
+    bgfx::touch(ViewID::COMBINE);
 
     // origin gizmo
     if(dbgEnableWorldOrigin) {
@@ -274,7 +372,7 @@ void Renderer::frame()
         const f32 transparent[] = {0, 0, 0, 0};
         bgfx::setUniform(u_color, transparent);
         bgfx::setVertexBuffer(0, originVbh, 0, BX_COUNTOF(s_originVertData));
-        bgfx::submit(RdrViewID::GAME, progDbgColor);
+        bgfx::submit(ViewID::GAME, progDbgColor);
     }
 
     // XY grid
@@ -293,7 +391,7 @@ void Renderer::frame()
         const f32 white[] = {0.5, 0.5, 0.5, 1};
         bgfx::setUniform(u_color, white);
         bgfx::setVertexBuffer(0, gridVbh, 0, BX_COUNTOF(s_gridLinesVertData));
-        bgfx::submit(RdrViewID::GAME, progDbgColor);
+        bgfx::submit(ViewID::GAME, progDbgColor);
     }
 
     static i64 timeOffset = bx::getHPCounter();
@@ -307,7 +405,7 @@ void Renderer::frame()
     bgfx::setVertexBuffer(0, vbhScreenQuad, 0, 6);
 
     bgfx::setTexture(0, u_sdiffuse, bgfx::getTexture(fbhGame, 0));
-    bgfx::submit(RdrViewID::COMBINE, progGameFinal);
+    bgfx::submit(ViewID::COMBINE, progGameFinal);
 
     bgfx::setState(0
         | BGFX_STATE_WRITE_RGB
@@ -317,7 +415,7 @@ void Renderer::frame()
     bgfx::setVertexBuffer(0, vbhScreenQuad, 0, 6);
 
     bgfx::setTexture(0, u_sdiffuse, bgfx::getTexture(fbhUI, 0));
-    bgfx::submit(RdrViewID::COMBINE, progUiFinal);
+    bgfx::submit(ViewID::COMBINE, progUiFinal);
 
     // Advance to next frame. Rendering thread will be kicked to
     // process submitted rendering primitives.
@@ -328,11 +426,21 @@ void Renderer::drawMesh(MeshHandle hmesh, const mat4& mtxModel, const vec4& colo
 {
     bgfx::setUniform(u_color, color);
 
-    meshSubmit(hmesh, RdrViewID::GAME, progVertShadingColor,
+    meshSubmit(hmesh, ViewID::GAME, progVertShadingColor,
                mtxModel, BGFX_STATE_MASK);
+
+    u64 state = 0
+        | (caps_shadowSamplerSupported ? 0 : BGFX_STATE_WRITE_RGB|BGFX_STATE_WRITE_A)
+        | BGFX_STATE_WRITE_Z
+        | BGFX_STATE_DEPTH_TEST_LESS
+        | BGFX_STATE_CULL_CCW
+        | BGFX_STATE_MSAA;
+
+    meshSubmit(hmesh, ViewID::SHADOW_MAP0, progShadow,
+               mtxModel, state);
 }
 
-void Renderer::drawCubeInstances(const InstanceData* instData, const i32 cubeCount)
+void Renderer::drawCubeInstances(const InstanceData* instData, const i32 cubeCount, const bool8 dropShadow)
 {
     // 80 bytes stride = 64 bytes for 4x4 matrix + 16 bytes for RGBA color.
     const u16 instanceStride = 80;
@@ -354,7 +462,21 @@ void Renderer::drawCubeInstances(const InstanceData* instData, const i32 cubeCou
             | BGFX_STATE_MSAA
             );
 
-        bgfx::submit(RdrViewID::GAME, progVertShadingColorInstance);
+        bgfx::submit(ViewID::GAME, progVertShadingColorInstance);
+
+        if(dropShadow) {
+            bgfx::setVertexBuffer(0, cubeVbh, 0, 36);
+            bgfx::setInstanceDataBuffer(&idb);
+
+            bgfx::setState(0
+               | (caps_shadowSamplerSupported ? 0 : BGFX_STATE_WRITE_RGB|BGFX_STATE_WRITE_A)
+               | BGFX_STATE_WRITE_Z
+               | BGFX_STATE_DEPTH_TEST_LESS
+               | BGFX_STATE_CULL_CCW
+               | BGFX_STATE_MSAA);
+
+            bgfx::submit(ViewID::SHADOW_MAP0, progShadowInstance);
+        }
     }
 }
 
