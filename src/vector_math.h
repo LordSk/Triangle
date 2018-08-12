@@ -33,6 +33,11 @@ union vec4
     }
 };
 
+inline vec4 vec4Splat(f32 one)
+{
+    return vec4{one, one, one, one};
+}
+
 union vec3
 {
     struct { f32 x, y, z; };
@@ -82,6 +87,16 @@ inline vec3 operator*(vec3 v, f32 scalar) {
 
 inline vec3 operator*(const vec3& v1, const vec3& v2) {
     return vec3{v1.x * v2.x, v1.y * v2.y, v1.z * v2.z};
+}
+
+inline f32 vec3Len(vec3 v)
+{
+    return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
+}
+
+inline vec3 vec3Norm(vec3 v1)
+{
+    return v1 * (1.0f / vec3Len(v1));
 }
 
 union vec2

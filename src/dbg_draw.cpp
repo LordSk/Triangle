@@ -167,7 +167,7 @@ struct DbgDraw
                 | BGFX_STATE_BLEND_ALPHA
                 );
 
-            bgfx::submit(0, progDbgColorInstance);
+            bgfx::submit(Renderer::ViewID::GAME, progDbgColorInstance);
         }
 
         instDataObb.clear();
@@ -192,7 +192,7 @@ struct DbgDraw
                 | BGFX_STATE_BLEND_ALPHA
                 );
 
-            bgfx::submit(0, progDbgColorInstance);
+            bgfx::submit(Renderer::ViewID::GAME, progDbgColorInstance);
         }
 
         instDataSphere.clear();

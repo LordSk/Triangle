@@ -1,17 +1,8 @@
 #include "renderer.h"
+#include "dbg_draw.h"
 #include "utils.h"
 #include <bgfx/bgfx.h>
 #include <bx/timer.h>
-
-struct ViewID
-{
-    enum Enum {
-        GAME = 0,
-        UI,
-        COMBINE,
-        SHADOW_MAP0,
-    };
-};
 
 // TODO: do not use this
 static bx::FileReader g_fileReader;
@@ -233,16 +224,19 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
     const bgfx::Caps& caps = *bgfx::getCaps();
     caps_shadowSamplerSupported = (caps.supported & BGFX_CAPS_TEXTURE_COMPARE_LEQUAL) != 0;
 
-    const i32 shadowMapSize = 2048;
+    const i32 shadowMapSize = 4096;
 
     if(caps_shadowSamplerSupported) {
         progShadow = loadProgram(&g_fileReader, "vs_shadow_leq", "fs_shadow_leq");
         progShadowInstance = loadProgram(&g_fileReader, "vs_shadow_leq_instance", "fs_shadow_leq");
+        progMeshShadowed = loadProgram(&g_fileReader, "vs_mesh_shadowed", "fs_mesh_shadowed");
+        progMeshShadowedInstance = loadProgram(&g_fileReader, "vs_mesh_shadowed_instance",
+                                               "fs_mesh_shadowed");
 
         bgfx::TextureHandle fbtextures[] =
         {
             bgfx::createTexture2D(shadowMapSize, shadowMapSize, false,
-                1, bgfx::TextureFormat::D16, BGFX_TEXTURE_RT | BGFX_TEXTURE_COMPARE_LEQUAL),
+                1, bgfx::TextureFormat::D24, BGFX_TEXTURE_RT | BGFX_TEXTURE_COMPARE_LEQUAL),
         };
         texShadowMap = fbtextures[0];
         fbhShadowMap = bgfx::createFrameBuffer(BX_COUNTOF(fbtextures), fbtextures, true);
@@ -289,6 +283,18 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
     bgfx::setViewClear(ViewID::SHADOW_MAP0, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, 0x303030ff, 1.0f, 0);
 
     u_depthScaleOffset = bgfx::createUniform("u_depthScaleOffset",  bgfx::UniformType::Vec4);
+    s_shadowMap = bgfx::createUniform("s_shadowMap",  bgfx::UniformType::Int1);
+    u_lightPos = bgfx::createUniform("u_lightPos",  bgfx::UniformType::Vec4);
+    u_lightMtx = bgfx::createUniform("u_lightMtx",  bgfx::UniformType::Mat4);
+    u_lightDir = bgfx::createUniform("u_lightDir",  bgfx::UniformType::Vec4);
+
+    if(!bgfx::isValid(s_shadowMap) ||
+       !bgfx::isValid(u_lightPos) ||
+       !bgfx::isValid(u_lightMtx) ||
+       !bgfx::isValid(u_lightDir)) {
+        LOG("ERROR> could not find uniforms");
+        return false;
+    }
 
     f32 depthScaleOffset[4] = { 1.0f, 0.0f, 0.0f, 0.0f };
     if(caps.homogeneousDepth) {
@@ -343,15 +349,52 @@ void Renderer::frame()
     bgfx::setViewTransform(ViewID::GAME, mtxView, mtxProj);
 
     // shadow map
+    static i64 t0 = bx::getHPCounter();
+    i64 now = bx::getHPCounter();
+    const f64 freq = f64(bx::getHPFrequency());
+    f32 time = f32((now - t0)/ freq) * 0.2;
+
     mat4 mtxLightProj, mtxLightView;
-    Camera camLight = cameraList[currentCamId];
+    Camera camLight;
+    camLight.eye = {50, 25, 30};
+    camLight.at = {50 + cosf(time) * 30.0f, 25.001f + sinf(time) * 30.0f, 0};
     bx::mtxLookAtRh(mtxLightView, camLight.eye, camLight.at, camLight.up);
 
+    // dbg draw light object
+    vec3 ld = vec3Norm(camLight.at - camLight.eye);
+    dbgDrawSphere(camLight.eye, 1, vec4Splat(1.0));
+    dbgDrawLine(camLight.eye, camLight.eye + ld * 5.f, vec4Splat(1.0), 0.1f);
+
     const bgfx::Caps* caps = bgfx::getCaps();
-    const float area = 30.0f;
-    bx::mtxOrthoRh(mtxLightProj, -area, area, -area, area, -100.0f, 100.0f, 0.0f, caps->homogeneousDepth);
+    const float area = 80.0f;
+    bx::mtxOrthoRh(mtxLightProj, -area, area, -area, area, -30.0f, 100.0f, 0.0f, caps->homogeneousDepth);
     bgfx::setViewTransform(ViewID::SHADOW_MAP0, mtxLightView, mtxLightProj);
 
+    vec4 lightPos;
+    memmove(lightPos.data, camLight.eye.data, sizeof(camLight.eye));
+
+    bgfx::setUniform(u_lightPos, lightPos);
+
+    vec3 dir = camLight.at - camLight.eye;
+    vec4 lightDir;
+    memmove(lightDir.data, dir.data, sizeof(dir));
+    bgfx::setUniform(u_lightDir, lightDir);
+
+    const float sy = caps->originBottomLeft ? 0.5f : -0.5f;
+    const float sz = caps->homogeneousDepth ? 0.5f :  1.0f;
+    const float tz = caps->homogeneousDepth ? 0.5f :  0.0f;
+    const mat4 mtxCrop =
+    {
+        0.5f, 0.0f, 0.0f, 0.0f,
+        0.0f,   sy, 0.0f, 0.0f,
+        0.0f, 0.0f, sz,   0.0f,
+        0.5f, 0.5f, tz,   1.0f,
+    };
+
+    mat4 mtxTmp;
+    bx::mtxMul(mtxTmp,   mtxLightProj, mtxCrop);
+    bx::mtxMul(mtxLight0, mtxLightView, mtxTmp);
+    bgfx::setUniform(u_lightMtx, mtxLight0);
 
     // This dummy draw call is here to make sure that view x is cleared
     // if no other draw calls are submitted to view x.
@@ -394,9 +437,6 @@ void Renderer::frame()
         bgfx::submit(ViewID::GAME, progDbgColor);
     }
 
-    static i64 timeOffset = bx::getHPCounter();
-    f32 time = (f32)((bx::getHPCounter()-timeOffset)/f64(bx::getHPFrequency()));
-
 
     bgfx::setState(0
         | BGFX_STATE_WRITE_RGB
@@ -424,9 +464,11 @@ void Renderer::frame()
 
 void Renderer::drawMesh(MeshHandle hmesh, const mat4& mtxModel, const vec4& color)
 {
+    bgfx::setUniform(u_lightMtx, mtxLight0);
+    bgfx::setTexture(0, s_shadowMap, texShadowMap);
     bgfx::setUniform(u_color, color);
 
-    meshSubmit(hmesh, ViewID::GAME, progVertShadingColor,
+    meshSubmit(hmesh, ViewID::GAME, progMeshShadowed,
                mtxModel, BGFX_STATE_MASK);
 
     u64 state = 0
@@ -434,7 +476,7 @@ void Renderer::drawMesh(MeshHandle hmesh, const mat4& mtxModel, const vec4& colo
         | BGFX_STATE_WRITE_Z
         | BGFX_STATE_DEPTH_TEST_LESS
         | BGFX_STATE_CULL_CCW
-        | BGFX_STATE_MSAA;
+        /*| BGFX_STATE_MSAA*/;
 
     meshSubmit(hmesh, ViewID::SHADOW_MAP0, progShadow,
                mtxModel, state);
@@ -462,7 +504,9 @@ void Renderer::drawCubeInstances(const InstanceData* instData, const i32 cubeCou
             | BGFX_STATE_MSAA
             );
 
-        bgfx::submit(ViewID::GAME, progVertShadingColorInstance);
+        bgfx::setTexture(0, s_shadowMap, texShadowMap);
+
+        bgfx::submit(ViewID::GAME, progMeshShadowedInstance);
 
         if(dropShadow) {
             bgfx::setVertexBuffer(0, cubeVbh, 0, 36);
@@ -473,11 +517,41 @@ void Renderer::drawCubeInstances(const InstanceData* instData, const i32 cubeCou
                | BGFX_STATE_WRITE_Z
                | BGFX_STATE_DEPTH_TEST_LESS
                | BGFX_STATE_CULL_CCW
-               | BGFX_STATE_MSAA);
+               /*| BGFX_STATE_MSAA*/);
 
             bgfx::submit(ViewID::SHADOW_MAP0, progShadowInstance);
         }
     }
+}
+
+void Renderer::drawCube(mat4 mtxModel, vec4 color)
+{
+    bgfx::setTransform(mtxModel);
+    bgfx::setUniform(u_color, color);
+
+    bgfx::setVertexBuffer(0, cubeVbh, 0, 36);
+    bgfx::setState(0
+        | BGFX_STATE_WRITE_MASK
+        | BGFX_STATE_DEPTH_TEST_LESS
+        | BGFX_STATE_CULL_CCW
+        | BGFX_STATE_MSAA
+        );
+
+    bgfx::setTexture(0, s_shadowMap, texShadowMap);
+    bgfx::submit(ViewID::GAME, progMeshShadowed);
+
+    bgfx::setTransform(mtxModel);
+    bgfx::setUniform(u_color, color);
+
+    bgfx::setVertexBuffer(0, cubeVbh, 0, 36);
+    bgfx::setState(0
+       | (caps_shadowSamplerSupported ? 0 : BGFX_STATE_WRITE_RGB|BGFX_STATE_WRITE_A)
+       | BGFX_STATE_WRITE_Z
+       | BGFX_STATE_DEPTH_TEST_LESS
+       | BGFX_STATE_CULL_CCW
+       | BGFX_STATE_MSAA);
+
+    bgfx::submit(ViewID::SHADOW_MAP0, progShadow);
 }
 
 void Renderer::setCamera(const i32 camId, Camera cam)

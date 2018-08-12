@@ -64,6 +64,7 @@ struct Room
     Transform tfRoom;
     vec3 size;
     Array<Transform> cubeTransforms;
+    Array<vec4> cubeColors;
     Array<mat4> cubeTfMtx;
 
     void make(vec3 size_, const i32 cubeSize);

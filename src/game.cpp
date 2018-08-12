@@ -79,6 +79,8 @@ void Room::make(vec3 size_, const i32 cubeSize)
 
     cubeTransforms.clear();
     cubeTransforms.reserve(width * height + 4);
+    cubeColors.clear();
+    cubeColors.reserve(width * height + 4);
 
     // background
     for(i32 y = 0; y < height; y++) {
@@ -90,8 +92,11 @@ void Room::make(vec3 size_, const i32 cubeSize)
             tfCube.scale = {(f32)cubeSize, (f32)cubeSize, 1.f};
             bx::quatIdentity(tfCube.rot);
             cubeTransforms.push_back(tfCube);
+            cubeColors.push(vec4{0.04f, 0.02f, 0.01f, 1.0f});
         }
     }
+
+    const vec4 wallColor = {0.012f, 0.011f, 0.01f, 1.0f};
 
     // walls
     Transform tfWall;
@@ -100,6 +105,7 @@ void Room::make(vec3 size_, const i32 cubeSize)
     tfWall.pos.y = -tfWall.scale.y * 0.5f;
     tfWall.pos.z = -size.z * 0.5;
     cubeTransforms.push_back(tfWall);
+    cubeColors.push(wallColor);
 
     tfWall = {};
     tfWall.scale = {size.x, cubeSize * 0.5f, size.z};
@@ -107,6 +113,7 @@ void Room::make(vec3 size_, const i32 cubeSize)
     tfWall.pos.y = size.y + tfWall.scale.y * 0.5f;
     tfWall.pos.z = -size.z * 0.5;
     cubeTransforms.push_back(tfWall);
+    cubeColors.push(wallColor);
 
     tfWall = {};
     tfWall.scale = {cubeSize * 0.5f, size.y, size.z};
@@ -114,6 +121,7 @@ void Room::make(vec3 size_, const i32 cubeSize)
     tfWall.pos.y = size.y * 0.5;
     tfWall.pos.z = -size.z * 0.5;
     cubeTransforms.push_back(tfWall);
+    cubeColors.push(wallColor);
 
     tfWall = {};
     tfWall.scale = {cubeSize * 0.5f, size.y, size.z};
@@ -121,6 +129,7 @@ void Room::make(vec3 size_, const i32 cubeSize)
     tfWall.pos.y = size.y * 0.5;
     tfWall.pos.z = -size.z * 0.5;
     cubeTransforms.push_back(tfWall);
+    cubeColors.push(wallColor);
 
     Collider colWall;
     OrientedBoundingBox obbWall;
@@ -213,7 +222,7 @@ bool GameData::init()
 
         tf.pos = vec3{ (f32)randRange(10, room.size.x-10), (f32)randRange(10, room.size.y-10), 0 };
         tf.scale = vec3Splat(1.5);
-
+        bx::quatRotateZ(tf.rot, rand01() * bx::kPi2);
 
         physBody.makeCircleBody(vec3ToVec2(tf.pos), 1.5f, 1.0, 0.0);
 
@@ -408,18 +417,25 @@ void GameData::render()
         Transform tf = room.cubeTransforms[i];
         mat4 mtx1;
 
-        //tf.pos.z = tf.pos.z - sin(time + i*0.21f) * 0.2;
+        tf.pos.z = tf.pos.z - sin(time + i*0.21f) * 0.2;
 
         // model * roomModel
         tf.toMtx(&mtx1);
         bx::mtxMul(inst.mtxModel, mtx1, mtxRoom);
 
-        inst.color = vec4{0.4f, 0.2f, 0.1f, 1.0f};
+        inst.color = room.cubeColors[i];
         instData[i] = inst;
     }
 
     rdr.drawCubeInstances(instData.data(), cubeCount, true);
 #endif
+
+    Transform testCubeTf;
+    testCubeTf.pos = {100, 25, 10};
+    testCubeTf.scale = {10, 40, 1};
+    mat4 mtxModel;
+    testCubeTf.toMtx(&mtxModel);
+    rdr.drawCube(mtxModel, vec4{0, 0.5f, 0, 1});
 
     // TODO: temporary
     // mouse cursor

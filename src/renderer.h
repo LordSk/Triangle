@@ -57,6 +57,16 @@ struct Camera
 
 struct Renderer
 {
+    struct ViewID
+    {
+        enum Enum {
+            SHADOW_MAP0 = 0,
+            GAME,
+            UI,
+            COMBINE,
+        };
+    };
+
     i32 renderWidth;
     i32 renderHeight;
 
@@ -69,10 +79,16 @@ struct Renderer
     bgfx::ProgramHandle progUiFinal;
     bgfx::ProgramHandle progShadow;
     bgfx::ProgramHandle progShadowInstance;
+    bgfx::ProgramHandle progMeshShadowed;
+    bgfx::ProgramHandle progMeshShadowedInstance;
 
     bgfx::UniformHandle u_color;
     bgfx::UniformHandle u_sdiffuse;
     bgfx::UniformHandle u_depthScaleOffset;
+    bgfx::UniformHandle s_shadowMap;
+    bgfx::UniformHandle u_lightPos;
+    bgfx::UniformHandle u_lightMtx;
+    bgfx::UniformHandle u_lightDir;
 
     bgfx::VertexBufferHandle cubeVbh;
     bgfx::VertexBufferHandle originVbh;
@@ -89,6 +105,7 @@ struct Renderer
 
     mat4 mtxProj;
     mat4 mtxView;
+    mat4 mtxLight0;
 
     Array<Camera> cameraList;
     i32 currentCamId = 0;
@@ -106,6 +123,7 @@ struct Renderer
 
     void drawMesh(MeshHandle hmesh, const mat4& mtxModel, const vec4& color);
     void drawCubeInstances(const InstanceData* instData, const i32 cubeCount, const bool8 dropShadow);
+    void drawCube(mat4 mtxModel, vec4 color);
 
     void setCamera(const i32 camId, Camera cam);
     void selectCamera(const i32 camId);
