@@ -55,6 +55,18 @@ struct Camera
     vec3 up  = {0, 0, 1.f};
 };
 
+struct LightDirectional
+{
+    vec3 pos;
+    vec3 dir;
+    f32 left;
+    f32 right;
+    f32 top;
+    f32 bottom;
+    f32 near_;
+    f32 far_;
+};
+
 struct Renderer
 {
     struct ViewID
@@ -127,6 +139,9 @@ struct Renderer
 
     void setCamera(const i32 camId, Camera cam);
     void selectCamera(const i32 camId);
+
+    void fitShadowMapToSceneBounds(LightDirectional* light, vec3 bmin, vec3 bmax);
+    void setupDirectionalShadowMap(const LightDirectional& light);
 };
 
 void setRendererGlobal(Renderer* renderer);

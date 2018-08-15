@@ -3,6 +3,7 @@
 #include "utils.h"
 #include <bgfx/bgfx.h>
 #include <bx/timer.h>
+#include <imgui/imgui.h>
 
 // TODO: do not use this
 static bx::FileReader g_fileReader;
@@ -236,7 +237,7 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
         bgfx::TextureHandle fbtextures[] =
         {
             bgfx::createTexture2D(shadowMapSize, shadowMapSize, false,
-                1, bgfx::TextureFormat::D24, BGFX_TEXTURE_RT | BGFX_TEXTURE_COMPARE_LEQUAL),
+                1, bgfx::TextureFormat::D24, BGFX_TEXTURE_RT|BGFX_TEXTURE_COMPARE_LEQUAL),
         };
         texShadowMap = fbtextures[0];
         fbhShadowMap = bgfx::createFrameBuffer(BX_COUNTOF(fbtextures), fbtextures, true);
@@ -340,42 +341,115 @@ void Renderer::setView(const mat4& proj, const mat4& view)
     mtxView = view;
 }
 
-void Renderer::frame()
+void Renderer::fitShadowMapToSceneBounds(LightDirectional* light, vec3 bmin, vec3 bmax)
 {
-    bgfx::setViewRect(ViewID::GAME, 0, 0, u16(renderWidth), u16(renderHeight));
-    bgfx::setViewRect(ViewID::UI, 0, 0, u16(renderWidth), u16(renderHeight));
-    bgfx::setViewRect(ViewID::COMBINE, 0, 0, u16(renderWidth), u16(renderHeight));
-
-    bgfx::setViewTransform(ViewID::GAME, mtxView, mtxProj);
-
-    // shadow map
-    static i64 t0 = bx::getHPCounter();
-    i64 now = bx::getHPCounter();
-    const f64 freq = f64(bx::getHPFrequency());
-    f32 time = f32((now - t0)/ freq) * 0.2;
-
     mat4 mtxLightProj, mtxLightView;
-    Camera camLight;
-    camLight.eye = {50, 25, 30};
-    camLight.at = {50 + cosf(time) * 30.0f, 25.001f + sinf(time) * 30.0f, 0};
-    bx::mtxLookAtRh(mtxLightView, camLight.eye, camLight.at, camLight.up);
-
-    // dbg draw light object
-    vec3 ld = vec3Norm(camLight.at - camLight.eye);
-    dbgDrawSphere(camLight.eye, 1, vec4Splat(1.0));
-    dbgDrawLine(camLight.eye, camLight.eye + ld * 5.f, vec4Splat(1.0), 0.1f);
+    bx::mtxLookAtRh(mtxLightView, light->pos, light->pos + light->dir, vec3{0, 0, 1});
 
     const bgfx::Caps* caps = bgfx::getCaps();
-    const float area = 80.0f;
-    bx::mtxOrthoRh(mtxLightProj, -area, area, -area, area, -30.0f, 100.0f, 0.0f, caps->homogeneousDepth);
+    bx::mtxOrthoRh(mtxLightProj, light->left, light->right, light->bottom, light->top,
+                   light->near_, light->far_, 0.0f, true);
+
+    mat4 mtxLightViewProj;
+    bx::mtxMul(mtxLightViewProj, mtxLightView, mtxLightProj);
+
+    // bound points
+    vec3 points[8] = {
+        bmin,
+        {bmax.x, bmin.y, bmin.z},
+        {bmin.x, bmax.y, bmin.z},
+        {bmax.x, bmax.y, bmin.z},
+
+        {bmin.x, bmin.y, bmax.z},
+        {bmax.x, bmin.y, bmax.z},
+        {bmin.x, bmax.y, bmax.z},
+        bmax,
+    };
+
+    f32 left = FLT_MAX;
+    f32 right = -FLT_MAX;
+    f32 top = FLT_MAX;
+    f32 bottom = -FLT_MAX;
+    f32 near = FLT_MAX;
+    f32 far = -FLT_MAX;
+
+    mat4 mtxInvViewProj;
+    mat4 mtxInvProj;
+    bx::mtxInverse(mtxInvViewProj, mtxLightViewProj);
+    bx::mtxInverse(mtxInvProj, mtxLightProj);
+
+    for(i32 i = 0; i < 8; i++) {
+        vec3 lsp; // light space point
+        bx::vec3MulMtx(lsp, points[i], mtxLightViewProj);
+
+        left = mmin(lsp.x, left);
+        right = mmax(lsp.x, right);
+        top = mmin(lsp.y, top);
+        bottom = mmax(lsp.y, bottom);
+        near = mmin(lsp.z, near);
+        far = mmax(lsp.z, far);
+    }
+
+    const vec3 lsPoints[8] {
+        {left, top, near},
+        {right, top, near},
+        {left, bottom, near},
+        {right, bottom, near},
+
+        {left, top, far},
+        {right, top, far},
+        {left, bottom, far},
+        {right, bottom, far},
+    };
+
+    f32 fixedLeft = FLT_MAX;
+    f32 fixedRight = -FLT_MAX;
+    f32 fixedTop = FLT_MAX;
+    f32 fixedBottom = -FLT_MAX;
+    f32 fixedNear = FLT_MAX;
+    f32 fixedFar = -FLT_MAX;
+
+    for(i32 i = 0; i < 8; i++) {
+        vec3 projp;
+        bx::vec3MulMtx(projp, lsPoints[i], mtxInvProj);
+
+        fixedLeft = mmin(projp.x, fixedLeft);
+        fixedRight = mmax(projp.x, fixedRight);
+        fixedTop = mmin(projp.y, fixedTop);
+        fixedBottom = mmax(projp.y, fixedBottom);
+        fixedNear = mmin(-projp.z, fixedNear); // I don't why z is reversed here
+        fixedFar = mmax(-projp.z, fixedFar);
+    }
+
+    light->left = fixedLeft;
+    light->right = fixedRight;
+    light->top = fixedTop;
+    light->bottom = fixedBottom;
+    light->near_ = fixedNear;
+    light->far_ = fixedFar;
+}
+
+void Renderer::setupDirectionalShadowMap(const LightDirectional& light)
+{
+    mat4 mtxLightProj, mtxLightView;
+    bx::mtxLookAtRh(mtxLightView, light.pos, light.pos + light.dir, vec3{0, 0, 1});
+
+    // dbg draw light object
+    vec3 ld = vec3Norm(light.dir);
+    dbgDrawSphere(light.pos, 1, vec4Splat(1.0));
+    dbgDrawLine(light.pos, light.pos + ld * 5.f, vec4Splat(1.0), 0.1f);
+
+    const bgfx::Caps* caps = bgfx::getCaps();
+    bx::mtxOrthoRh(mtxLightProj, light.left, light.right, light.bottom, light.top,
+                   light.near_, light.far_, 0.0f, caps->homogeneousDepth);
+
     bgfx::setViewTransform(ViewID::SHADOW_MAP0, mtxLightView, mtxLightProj);
 
     vec4 lightPos;
-    memmove(lightPos.data, camLight.eye.data, sizeof(camLight.eye));
-
+    memmove(lightPos.data, light.pos.data, sizeof(light.pos));
     bgfx::setUniform(u_lightPos, lightPos);
 
-    vec3 dir = camLight.at - camLight.eye;
+    vec3 dir = ld;
     vec4 lightDir;
     memmove(lightDir.data, dir.data, sizeof(dir));
     bgfx::setUniform(u_lightDir, lightDir);
@@ -394,7 +468,50 @@ void Renderer::frame()
     mat4 mtxTmp;
     bx::mtxMul(mtxTmp,   mtxLightProj, mtxCrop);
     bx::mtxMul(mtxLight0, mtxLightView, mtxTmp);
+
     bgfx::setUniform(u_lightMtx, mtxLight0);
+}
+
+void Renderer::frame()
+{
+    bgfx::setViewRect(ViewID::GAME, 0, 0, u16(renderWidth), u16(renderHeight));
+    bgfx::setViewRect(ViewID::UI, 0, 0, u16(renderWidth), u16(renderHeight));
+    bgfx::setViewRect(ViewID::COMBINE, 0, 0, u16(renderWidth), u16(renderHeight));
+
+    bgfx::setViewTransform(ViewID::GAME, mtxView, mtxProj);
+
+    // shadow map
+    static i64 t0 = bx::getHPCounter();
+    i64 now = bx::getHPCounter();
+    const f64 freq = f64(bx::getHPFrequency());
+    f32 time = f32((now - t0)/ freq) * 0.2;
+
+    Camera camLight;
+    camLight.eye = {50, 25, 30};
+    camLight.at = {50 + cosf(time) * 30.0f, 25.001f + sinf(time) * 30.0f, 0};
+    //camLight.at = {50 + 15, 25.001f + 15, 0};
+
+    LightDirectional sunlight;
+    sunlight.left = -10.f;
+    sunlight.right = 10.f;
+    sunlight.top = -10.f;
+    sunlight.bottom = 10.f;
+    sunlight.near_ = -10.f;
+    sunlight.far_ = 10.f;
+    sunlight.pos = camLight.eye;
+    sunlight.dir = camLight.at - camLight.eye;
+
+    // TODO: plug this in
+    vec3 sceneBoundPos = {-10, -10, -10};
+    vec3 sceneBoundSize = {120, 65, 30};
+
+    fitShadowMapToSceneBounds(&sunlight, sceneBoundPos, sceneBoundPos + sceneBoundSize);
+    setupDirectionalShadowMap(sunlight);
+
+    dbgDrawOrthoFrustrum(sunlight.pos, sunlight.pos + sunlight.dir, sunlight.near_, sunlight.far_,
+                         sunlight.left, sunlight.right, sunlight.top, sunlight.bottom,
+                         vec4{1, 1, 0, 1}, 0.1f);
+
 
     // This dummy draw call is here to make sure that view x is cleared
     // if no other draw calls are submitted to view x.
@@ -516,7 +633,7 @@ void Renderer::drawCubeInstances(const InstanceData* instData, const i32 cubeCou
                | (caps_shadowSamplerSupported ? 0 : BGFX_STATE_WRITE_RGB|BGFX_STATE_WRITE_A)
                | BGFX_STATE_WRITE_Z
                | BGFX_STATE_DEPTH_TEST_LESS
-               | BGFX_STATE_CULL_CCW
+               | BGFX_STATE_CULL_CW
                /*| BGFX_STATE_MSAA*/);
 
             bgfx::submit(ViewID::SHADOW_MAP0, progShadowInstance);

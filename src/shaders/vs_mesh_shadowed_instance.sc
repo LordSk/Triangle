@@ -21,7 +21,7 @@ void main()
 	v_normal = worldNormal;
 	v_position = worldPos;
 
-	const float shadowMapOffset = 0.001;
+	const float shadowMapOffset = 0.000;
 	vec3 posOffset = a_position + a_normal.xyz * shadowMapOffset;
     vec4 worldPosOffset = instMul(model, vec4(posOffset, 1.0));
 	v_shadowcoord = mul(u_lightMtx, worldPosOffset);

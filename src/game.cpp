@@ -100,16 +100,16 @@ void Room::make(vec3 size_, const i32 cubeSize)
 
     // walls
     Transform tfWall;
-    tfWall.scale = {size.x, cubeSize * 0.5f, size.z};
-    tfWall.pos.x = size.x * 0.5f;
+    tfWall.scale = {size.x + cubeSize, cubeSize * 0.5f, size.z};
+    tfWall.pos.x = tfWall.scale.x * 0.5f - cubeSize * 0.5f;
     tfWall.pos.y = -tfWall.scale.y * 0.5f;
     tfWall.pos.z = -size.z * 0.5;
     cubeTransforms.push_back(tfWall);
     cubeColors.push(wallColor);
 
     tfWall = {};
-    tfWall.scale = {size.x, cubeSize * 0.5f, size.z};
-    tfWall.pos.x = size.x * 0.5f;
+    tfWall.scale = {size.x + cubeSize, cubeSize * 0.5f, size.z};
+    tfWall.pos.x = tfWall.scale.x * 0.5f - cubeSize * 0.5f;
     tfWall.pos.y = size.y + tfWall.scale.y * 0.5f;
     tfWall.pos.z = -size.z * 0.5;
     cubeTransforms.push_back(tfWall);
@@ -395,6 +395,11 @@ void GameData::update(f64 delta)
     ImGui::Image(rdr.texShadowMap, ImVec2(512, 512));
 
     ImGui::End();*/
+
+    Transform roomRect;
+    roomRect.pos = sceneBoundPos;
+    roomRect.scale = sceneBoundSize;
+    dbgDrawRectLine(roomRect, vec4{0, 1, 0, 1});
 }
 
 void GameData::render()

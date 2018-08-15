@@ -215,6 +215,49 @@ void dbgDrawRect(const Transform& tf, vec4 color)
 {
     g_dbgDraw.obb(tf, color);
 }
+void dbgDrawRectLine(const Transform& tf, vec4 color, f32 thick)
+{
+    mat4 mtxTf;
+    tf.toMtx(&mtxTf);
+
+    vec3 pmin = {0, 0, 0};
+    vec3 pmax = {1, 1, 1};
+
+    vec3 ftl = pmin;
+    vec3 ftr = {pmax.x, pmin.y, pmin.z};
+    vec3 fbl = {pmin.x, pmax.y, pmin.z};
+    vec3 fbr = {pmax.x, pmax.y, pmin.z};
+
+    vec3 btl = {pmin.x, pmin.y, pmax.z};
+    vec3 btr = {pmax.x, pmin.y, pmax.z};
+    vec3 bbl = {pmin.x, pmax.y, pmax.z};
+    vec3 bbr = pmax;
+
+    bx::vec3MulMtxH(ftl, ftl, mtxTf);
+    bx::vec3MulMtxH(ftr, ftr, mtxTf);
+    bx::vec3MulMtxH(fbl, fbl, mtxTf);
+    bx::vec3MulMtxH(fbr, fbr, mtxTf);
+
+    bx::vec3MulMtxH(btl, btl, mtxTf);
+    bx::vec3MulMtxH(btr, btr, mtxTf);
+    bx::vec3MulMtxH(bbl, bbl, mtxTf);
+    bx::vec3MulMtxH(bbr, bbr, mtxTf);
+
+    g_dbgDraw.line(ftl, ftr, color, thick);
+    g_dbgDraw.line(fbl, fbr, color, thick);
+    g_dbgDraw.line(ftl, fbl, color, thick);
+    g_dbgDraw.line(ftr, fbr, color, thick);
+
+    g_dbgDraw.line(btl, btr, color, thick);
+    g_dbgDraw.line(bbl, bbr, color, thick);
+    g_dbgDraw.line(btl, bbl, color, thick);
+    g_dbgDraw.line(btr, bbr, color, thick);
+
+    g_dbgDraw.line(ftl, btl, color, thick);
+    g_dbgDraw.line(ftr, btr, color, thick);
+    g_dbgDraw.line(fbl, bbl, color, thick);
+    g_dbgDraw.line(fbr, bbr, color, thick);
+}
 
 void dbgDrawLine(const vec3& p1, const vec3& p2, vec4 color, f32 thickness)
 {
@@ -229,4 +272,78 @@ void dbgDrawRender()
 void dbgDrawSphere(const vec3& pos, f32 radius, vec4 color)
 {
     g_dbgDraw.sphere(pos, radius, color);
+}
+
+void dbgDrawOrthoFrustrum(const vec3& eye, const vec3& at, f32 near, f32 far, f32 left,
+                          f32 right, f32 top, f32 bottom, vec4 color, f32 thick)
+{
+    vec3 dir = vec3Norm(at - eye);
+    vec3 up = {0, 0, 1};
+    vec3 vright;
+    bx::vec3Cross(vright, dir, up);
+    vright = vec3Norm(vright);
+    bx::vec3Cross(up, vright, dir);
+    up = vec3Norm(up);
+
+    const vec3 ftl = eye + (vright * left) + up * top + dir * near;
+    const vec3 ftr = eye + (vright * right) + up * top + dir * near;
+    const vec3 fbl = eye + (vright * left) + up * bottom + dir * near;
+    const vec3 fbr = eye + (vright * right) + up * bottom + dir * near;
+
+    const vec3 btl = eye + (vright * left) + up * top + dir * far;
+    const vec3 btr = eye + (vright * right) + up * top + dir * far;
+    const vec3 bbl = eye + (vright * left) + up * bottom + dir * far;
+    const vec3 bbr = eye + (vright * right) + up * bottom + dir * far;
+
+    g_dbgDraw.line(ftl, ftr, color, thick);
+    g_dbgDraw.line(fbl, fbr, color, thick);
+    g_dbgDraw.line(ftl, fbl, color, thick);
+    g_dbgDraw.line(ftr, fbr, color, thick);
+
+    g_dbgDraw.line(btl, btr, color, thick);
+    g_dbgDraw.line(bbl, bbr, color, thick);
+    g_dbgDraw.line(btl, bbl, color, thick);
+    g_dbgDraw.line(btr, bbr, color, thick);
+
+    g_dbgDraw.line(ftl, btl, color, thick);
+    g_dbgDraw.line(ftr, btr, color, thick);
+    g_dbgDraw.line(fbl, bbl, color, thick);
+    g_dbgDraw.line(fbr, bbr, color, thick);
+}
+
+void dbgDrawOrthoFrustrumSolid(const vec3& eye, const vec3& at, f32 near, f32 far, f32 left,
+                               f32 right, f32 top, f32 bottom, vec4 color, f32 thick)
+{
+    vec3 dir = vec3Norm(at - eye);
+    vec3 up = {0, 0, 1};
+    vec3 vright;
+    bx::vec3Cross(vright, dir, up);
+    bx::vec3Cross(up, vright, dir);
+
+    const vec3 ftl = eye + (vright * left) + up * top + dir * near;
+    const vec3 ftr = eye + (vright * right) + up * top + dir * near;
+    const vec3 fbl = eye + (vright * left) + up * bottom + dir * near;
+    const vec3 fbr = eye + (vright * right) + up * bottom + dir * near;
+
+    const vec3 btl = eye + (vright * left) + up * top + dir * far;
+    const vec3 btr = eye + (vright * right) + up * top + dir * far;
+    const vec3 bbl = eye + (vright * left) + up * bottom + dir * far;
+    const vec3 bbr = eye + (vright * right) + up * bottom + dir * far;
+
+
+    g_dbgDraw.line(ftl, ftr, color, thick);
+    g_dbgDraw.line(fbl, fbr, color, thick);
+    g_dbgDraw.line(ftl, fbl, color, thick);
+    g_dbgDraw.line(ftr, fbr, color, thick);
+
+    g_dbgDraw.line(btl, btr, color, thick);
+    g_dbgDraw.line(bbl, bbr, color, thick);
+    g_dbgDraw.line(btl, bbl, color, thick);
+    g_dbgDraw.line(btr, bbr, color, thick);
+
+    g_dbgDraw.line(ftl, btl, color, thick);
+    g_dbgDraw.line(ftr, btr, color, thick);
+    g_dbgDraw.line(fbl, bbl, color, thick);
+    g_dbgDraw.line(fbr, bbr, color, thick);
+    assert(0); // TODO: implement
 }

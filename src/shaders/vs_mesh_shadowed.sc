@@ -13,7 +13,7 @@ void main()
 
 	v_normal = normalize(mul(u_model[0], vec4(a_normal, 0.0)).xyz);
 
-	const float shadowMapOffset = 0.001;
+	const float shadowMapOffset = 0.000;
 	vec3 posOffset = a_position + a_normal * shadowMapOffset;
     vec4 worldPosOff = mul(u_model[0], vec4(posOffset, 1.0));
 	v_shadowcoord = mul(u_lightMtx, worldPosOff);

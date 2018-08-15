@@ -92,6 +92,9 @@ struct GameData
     i32 playerEid = -1;
     i32 weapBulletCount = 0;
 
+    vec3 sceneBoundPos = {-10, -10, -10};
+    vec3 sceneBoundSize = {120, 65, 30};
+
     bool init();
     void deinit();
 
