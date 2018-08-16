@@ -47,6 +47,8 @@ void updateDmgZone(EntityComponentSystem* ecs, CDmgZone* eltList, const i32 coun
         dmgWorld.registerZone((DamageTeam::Enum)dmgBody.team, dmgBody.collider, zi);
     }
 
+    dmgWorld.resolveIntersections();
+
     DamageFrame::IntersectInfo* lastFrameInterList = dmgWorld.intersectList.data();
     const i32 lastFrameInterCount = dmgWorld.intersectList.count();
 
@@ -135,7 +137,6 @@ void updateBulletMovement(EntityComponentSystem* ecs, CBulletMovement* eltList, 
     for(i32 i = 0; i < count; i++) {
         CBulletMovement& bulletMove = eltList[i];
         const i32 eid = entityId[i];
-        assert(ecs->entityCompBits[eid] & ComponentBit::Transform);
         CTransform& tf = ecs->getCompTransform(eid);
         vec2 bpos = vec3ToVec2(tf.pos);
         bpos += bulletMove.vel * delta;
@@ -219,21 +220,6 @@ void updateShipControllerAi(EntityComponentSystem* ecs, CShipControllerAi* eltLi
             input.down = fwdDir == -1;
         }
     }
-
-    for(i32 i = 0; i < count; i++) {
-        const i32 eid = entityId[i];
-
-        assert(ecs->entityCompBits[eid] & ComponentBit::DmgZone);
-        CDmgZone& dmgZone = ecs->getCompDmgZone(eid);
-
-        const i32 interCount = dmgZone.lastFrameInterList.count;
-        if(interCount > 0) {
-            ecs->deleteEntity(eid);
-        }
-        for(i32 j = 0; j < interCount; j++) {
-
-        }
-    }
 }
 
 void onDeleteTransform(EntityComponentSystem* ecs, CTransform* eltList, const i32 count,
@@ -286,4 +272,62 @@ void onDeleteShipControllerHuman(EntityComponentSystem* ecs, CShipControllerHuma
 void onDeleteShipControllerAi(EntityComponentSystem* ecs, CShipControllerAi* eltList, const i32 count,
                               const i32* entityId, bool8* entDeleteFlag)
 {
+}
+
+void updateHealthCore(EntityComponentSystem* ecs, CHealthCore* eltList, const i32 count, const i32* entityId,
+                      f64 delta, f64 physLerpAlpha)
+{
+    for(i32 i = 0; i < count; i++) {
+        CHealthCore& core = eltList[i];
+        const i32 eid = entityId[i];
+
+        if(ecs->entityCompBits[eid] & ComponentBit::DrawMesh) {
+            CDrawMesh& mesh = ecs->getCompDrawMesh(eid);
+            f32 alpha = mmax(0, core.health/core.healthMax);
+            alpha *= alpha * alpha;
+            mesh.color = vec4{0, alpha, 1, 1};
+        }
+
+        CDmgZone& dmgZone = ecs->getCompDmgZone(eid);
+        const i32 interCount = dmgZone.lastFrameInterList.count;
+        if(!interCount) continue;
+
+        for(i32 j = 0; j < interCount; j++) {
+            if(dmgZone.lastFrameInterList[j].team2 == DamageTeam::NEUTRAL) {
+                continue;
+            }
+            core.health -= 10;
+            if(core.health <= 0) {
+                ecs->deleteEntity(eid);
+            }
+        }
+    }
+}
+
+void onDeleteHealthCore(EntityComponentSystem* ecs, CHealthCore* eltList, const i32 count,
+                        const i32* entityId, bool8* entDeleteFlag)
+{
+
+}
+
+void updateBulletLogic(EntityComponentSystem* ecs, CBulletLogic* eltList, const i32 count,
+                       const i32* entityId, f64 delta, f64 physLerpAlpha)
+{
+    for(i32 i = 0; i < count; i++) {
+        CBulletLogic& bl = eltList[i];
+        const i32 eid = entityId[i];
+        CDmgZone& dmgZone = ecs->getCompDmgZone(eid);
+
+        const i32 interCount = dmgZone.lastFrameInterList.count;
+        for(i32 j = 0; j < interCount; j++) {
+            ecs->deleteEntity(eid);
+            break;
+        }
+    }
+}
+
+void onDeleteBulletLogic(EntityComponentSystem* ecs, CBulletLogic* eltList, const i32 count,
+                         const i32* entityId, bool8* entDeleteFlag)
+{
+
 }

@@ -5,6 +5,8 @@
 #include "utils.h"
 #include <bgfx/bgfx.h>
 
+#define SHADOW_MAP_COUNT_MAX 8
+
 // TODO: move this
 struct PosColorVertex
 {
@@ -55,16 +57,13 @@ struct Camera
     vec3 up  = {0, 0, 1.f};
 };
 
-struct LightDirectional
+struct ShadowMapDirectional
 {
     vec3 pos;
     vec3 dir;
-    f32 left;
-    f32 right;
-    f32 top;
-    f32 bottom;
-    f32 near_;
-    f32 far_;
+    vec3 orthoMin;
+    vec3 orthoMax;
+    AABB worldArea;
 };
 
 struct Renderer
@@ -73,6 +72,14 @@ struct Renderer
     {
         enum Enum {
             SHADOW_MAP0 = 0,
+            SHADOW_MAP1,
+            SHADOW_MAP2,
+            SHADOW_MAP3,
+            SHADOW_MAP4,
+            SHADOW_MAP5,
+            SHADOW_MAP6,
+            SHADOW_MAP7,
+
             GAME,
             UI,
             COMBINE,
@@ -109,9 +116,9 @@ struct Renderer
 
     bgfx::FrameBufferHandle fbhGame;
     bgfx::FrameBufferHandle fbhUI;
-    bgfx::FrameBufferHandle fbhShadowMap;
 
-    bgfx::TextureHandle texShadowMap;
+    bgfx::FrameBufferHandle fbhShadowMap[SHADOW_MAP_COUNT_MAX];
+    bgfx::TextureHandle texShadowMap[SHADOW_MAP_COUNT_MAX];
 
     bool8 caps_shadowSamplerSupported;
 
@@ -140,8 +147,8 @@ struct Renderer
     void setCamera(const i32 camId, Camera cam);
     void selectCamera(const i32 camId);
 
-    void fitShadowMapToSceneBounds(LightDirectional* light, vec3 bmin, vec3 bmax);
-    void setupDirectionalShadowMap(const LightDirectional& light);
+    void fitShadowMapToSceneBounds(ShadowMapDirectional* light);
+    void setupDirectionalShadowMap(const ShadowMapDirectional& light, const i32 shadowMapId);
 };
 
 void setRendererGlobal(Renderer* renderer);

@@ -131,24 +131,43 @@ void Room::make(vec3 size_, const i32 cubeSize)
     cubeTransforms.push_back(tfWall);
     cubeColors.push(wallColor);
 
+    wallColliders.reserve(4);
+
     Collider colWall;
     OrientedBoundingBox obbWall;
     obbWall.origin = vec2{ 0, -cubeSize * 0.5f };
     obbWall.size = vec2{ size.x, cubeSize * 0.5f };
     obbWall.angle = 0;
     physWorld.addStaticCollider(colWall.makeObb(obbWall));
+    wallColliders.push(colWall);
 
     obbWall.origin = vec2{ 0, size.y };
     obbWall.size = vec2{ size.x, cubeSize * 0.5f };
     physWorld.addStaticCollider(colWall.makeObb(obbWall));
+    wallColliders.push(colWall);
 
     obbWall.origin = vec2{ -cubeSize * 0.5f, 0 };
     obbWall.size = vec2{ cubeSize * 0.5f, size.y };
     physWorld.addStaticCollider(colWall.makeObb(obbWall));
+    wallColliders.push(colWall);
 
     obbWall.origin = vec2{ size.x, 0 };
     obbWall.size = vec2{ cubeSize * 0.5f, size.y };
     physWorld.addStaticCollider(colWall.makeObb(obbWall));
+    wallColliders.push(colWall);
+}
+
+void Room::addWallsToDamageFrame()
+{
+    DamageFrame& df = getDmgFrame();
+
+    const i32 wallCount = wallColliders.count();
+    const Collider* walls = wallColliders.data();
+
+    for(i32 i = 0; i < wallCount; ++i) {
+        DamageFrame::ZoneInfo zi = {};
+        df.registerZone(DamageTeam::NEUTRAL, walls[i], zi);
+    }
 }
 
 bool GameData::init()
@@ -219,6 +238,7 @@ bool GameData::init()
         ecs.addCompShipControllerAi(eid);
         ecs.addCompEnemyBasicMovement(eid);
         CShipWeapon& weap = ecs.addCompShipWeapon(eid);
+        CHealthCore& healthCore = ecs.addCompHealthCore(eid);
 
         tf.pos = vec3{ (f32)randRange(10, room.size.x-10), (f32)randRange(10, room.size.y-10), 0 };
         tf.scale = vec3Splat(1.5);
@@ -244,6 +264,9 @@ bool GameData::init()
         weap.dmgTeam = DamageTeam::ENEMY;
         weap.hMeshBullet = meshBullet1;
         weap.meshColor = mesh.color;
+
+        healthCore.healthMax = 50;
+        healthCore.health = 50;
     }
 
     return true;
@@ -316,14 +339,14 @@ void GameData::update(f64 delta)
     DamageFrame& dmgWorld = getDmgFrame();
     dmgWorld.clearZones();
 
+    room.addWallsToDamageFrame();
+
     ecs.removeFlaggedForDeletion();
     ecs.update(delta, physLerpAlpha);
 
     if(dbgEnableDmgZones) {
        dmgWorld.dbgDraw();
     }
-
-    dmgWorld.resolveIntersections();
 
     // set camera view
     mat4 mtxProj;
@@ -395,11 +418,6 @@ void GameData::update(f64 delta)
     ImGui::Image(rdr.texShadowMap, ImVec2(512, 512));
 
     ImGui::End();*/
-
-    Transform roomRect;
-    roomRect.pos = sceneBoundPos;
-    roomRect.scale = sceneBoundSize;
-    dbgDrawRectLine(roomRect, vec4{0, 1, 0, 1});
 }
 
 void GameData::render()

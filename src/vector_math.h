@@ -38,6 +38,18 @@ inline vec4 vec4Splat(f32 one)
     return vec4{one, one, one, one};
 }
 
+inline vec4 operator+(const vec4& v1, const vec4& v2) {
+    return vec4{v1.x + v2.x, v1.y + v2.y, v1.z + v2.z, v1.w + v2.w};
+}
+
+inline vec4 operator-(const vec4& v1, const vec4& v2) {
+    return vec4{v1.x - v2.x, v1.y - v2.y, v1.z - v2.z, v1.w - v2.w};
+}
+
+inline vec4 operator*(vec4 v, f32 scalar) {
+    return vec4{v.x * scalar, v.y * scalar, v.z * scalar, v.w * scalar};
+}
+
 union vec3
 {
     struct { f32 x, y, z; };
@@ -278,4 +290,10 @@ struct Transform
         bx::mtxMul(mtx1, mtxScale, mtxRot);
         bx::mtxMul(*mtxModel, mtx1, mtxTrans);
     }
+};
+
+struct AABB
+{
+    vec3 bmin;
+    vec3 bmax;
 };

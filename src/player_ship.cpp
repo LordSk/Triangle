@@ -4,7 +4,7 @@
 #include "input_recorder.h"
 #include "ecs.h"
 #include "renderer.h"
-#include "game.h" // Damage* stuff, TODO: remove
+#include "game.h"
 
 static vec3 screenToXyPlanePos(const mat4& invViewProj, vec2 screenPos, vec3 camPos)
 {
@@ -169,6 +169,7 @@ void updateShipWeapon(EntityComponentSystem* ecs, CShipWeapon* eltList, const i3
             CBulletMovement& bm = ecs->addCompBulletMovement(bid);
             CDmgZone& dmgBody = ecs->addCompDmgZone(bid);
             CDrawMesh& meshComp = ecs->addCompDrawMesh(bid);
+            CBulletLogic& bulletLogic = ecs->addCompBulletLogic(bid);
 
             CTransform& weapTf = ecs->getCompTransform(eid); // Note: re-get the component since we added
             // a Transform and then might have realloced ArraySparse data
@@ -180,6 +181,7 @@ void updateShipWeapon(EntityComponentSystem* ecs, CShipWeapon* eltList, const i3
             bulletCol.makeCb(CircleBound{{}, 0.7f});
             dmgBody.collider = bulletCol;
             dmgBody.team = weap.dmgTeam;
+            dmgBody.tag = bid;
 
             // hacky to get direction
             // TODO: do better

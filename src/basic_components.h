@@ -9,7 +9,7 @@ struct CTransform : Transform
 {
 };
 
-//@Component
+//@Component(order=0)
 struct CPhysBody
 {
     i32 bodyId = -1;
@@ -29,7 +29,8 @@ struct CPhysBody
     }
 };
 
-//@Component
+// this order thing is not that great, but it works for now
+//@Component(order=1)
 struct CDmgZone
 {
     typedef i32 DamageWorldTeam;
@@ -61,6 +62,17 @@ struct CBulletMovement
 };
 
 //@Component
+struct CBulletLogic
+{
+    //
+};
+
+void updateBulletLogic(struct EntityComponentSystem* ecs, CBulletLogic* eltList, const i32 count,
+                      const i32* entityId, f64 delta, f64 physLerpAlpha);
+void onDeleteBulletLogic(struct EntityComponentSystem* ecs, CBulletLogic* eltList, const i32 count,
+                        const i32* entityId, bool8* entDeleteFlag);
+
+//@Component
 struct CShipInput
 {
     bool8 left;
@@ -85,6 +97,19 @@ struct CShipControllerAi
     f32 changeRightDirCd = 0;
     f32 changeFwdDirCd = 0;
 };
+
+//@Component
+struct CHealthCore
+{
+    f32 healthMax = 100;
+    f32 health = 100;
+    //
+};
+
+void updateHealthCore(struct EntityComponentSystem* ecs, CHealthCore* eltList, const i32 count,
+                      const i32* entityId, f64 delta, f64 physLerpAlpha);
+void onDeleteHealthCore(struct EntityComponentSystem* ecs, CHealthCore* eltList, const i32 count,
+                        const i32* entityId, bool8* entDeleteFlag);
 
 void updateTransform(struct EntityComponentSystem* ecs, CTransform* eltList, const i32 count,const i32* entityId,
                     f64 delta, f64 physLerpAlpha);

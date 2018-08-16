@@ -10,7 +10,7 @@ uniform vec4 u_lightDir;
 
 void main()
 {
-	float shadowMapBias = 0.001;
+	float shadowMapBias = 0.002;
 	//float shadowMapBias = 0;
 	vec3 color = v_color0.rgb;
 

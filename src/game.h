@@ -66,8 +66,10 @@ struct Room
     Array<Transform> cubeTransforms;
     Array<vec4> cubeColors;
     Array<mat4> cubeTfMtx;
+    Array<Collider> wallColliders;
 
     void make(vec3 size_, const i32 cubeSize);
+    void addWallsToDamageFrame();
 };
 
 struct GameData
@@ -91,9 +93,6 @@ struct GameData
     Room room;
     i32 playerEid = -1;
     i32 weapBulletCount = 0;
-
-    vec3 sceneBoundPos = {-10, -10, -10};
-    vec3 sceneBoundSize = {120, 65, 30};
 
     bool init();
     void deinit();
