@@ -100,9 +100,14 @@ struct Renderer
     bgfx::ProgramHandle progShadowInstance;
     bgfx::ProgramHandle progMeshShadowed;
     bgfx::ProgramHandle progMeshShadowedInstance;
+    bgfx::ProgramHandle progGbuffer;
+    bgfx::ProgramHandle progGbufferInst;
 
     bgfx::UniformHandle u_color;
-    bgfx::UniformHandle u_sdiffuse;
+    bgfx::UniformHandle s_albedo;
+    bgfx::UniformHandle s_position;
+    bgfx::UniformHandle s_normal;
+    bgfx::UniformHandle s_depth;
     bgfx::UniformHandle u_depthScaleOffset;
     bgfx::UniformHandle s_shadowMap;
     bgfx::UniformHandle u_lightPos;

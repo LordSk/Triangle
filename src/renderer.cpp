@@ -106,6 +106,7 @@ Renderer& getRenderer()
 
 bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
 {
+    const bgfx::Caps& caps = *bgfx::getCaps();
     renderWidth = renderWidth_;
     renderHeight = renderHeight_;
 
@@ -126,6 +127,11 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
 
     bgfx::setDebug(BGFX_DEBUG_TEXT);
 
+    if(caps.limits.maxFBAttachments < 3) {
+        LOG("ERROR> caps.limits.maxFBAttachments < 3");
+        return false;
+    }
+
     const u32 samplerFlags = 0
                     | BGFX_TEXTURE_RT
                     | BGFX_TEXTURE_MIN_POINT
@@ -137,14 +143,24 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
 
     // TODO: fix depth buffer multisampling
     // https://github.com/bkaradzic/bgfx/issues/1353
-    bgfx::TextureHandle fbTexGame[2];
+    bgfx::TextureHandle fbTexGame[4];
+    // albedo
     fbTexGame[0] = bgfx::createTexture2D(u16(renderWidth), u16(renderHeight), false,
                                          1, bgfx::TextureFormat::BGRA8,
-                                         samplerFlags|BGFX_TEXTURE_SRGB/*|BGFX_TEXTURE_RT_MSAA_X16*/);
+                                         samplerFlags);
+    // position
     fbTexGame[1] = bgfx::createTexture2D(u16(renderWidth), u16(renderHeight), false,
+                                         1, bgfx::TextureFormat::RGBA32F,
+                                         samplerFlags);
+    // normal
+    fbTexGame[2] = bgfx::createTexture2D(u16(renderWidth), u16(renderHeight), false,
+                                         1, bgfx::TextureFormat::BGRA8,
+                                         samplerFlags);
+    // depth
+    fbTexGame[3] = bgfx::createTexture2D(u16(renderWidth), u16(renderHeight), false,
                                          1, bgfx::TextureFormat::D24,
-                                         samplerFlags/*|BGFX_TEXTURE_RT_MSAA_X16*/);
-    fbhGame = bgfx::createFrameBuffer(2, fbTexGame, true);
+                                         samplerFlags);
+    fbhGame = bgfx::createFrameBuffer(arr_count(fbTexGame), fbTexGame, true);
 
     if(!bgfx::isValid(fbhGame)) {
         LOG("ERROR> could not create game frame buffer");
@@ -162,7 +178,7 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
     }
 
     // Set view clear state.
-    bgfx::setViewClear(ViewID::GAME, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, 0x101010ff, 1.0f, 0.f);
+    bgfx::setViewClear(ViewID::GAME, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, 0x00000000, 1.0f, 0.f);
     bgfx::setViewClear(ViewID::UI, BGFX_CLEAR_COLOR, 0x00000000, 1.f, 0.f);
     bgfx::setViewClear(ViewID::COMBINE, BGFX_CLEAR_COLOR, 0x101010ff, 1.0f, 0.f);
 
@@ -195,7 +211,10 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
                         );
 
     u_color = bgfx::createUniform("u_color", bgfx::UniformType::Vec4);
-    u_sdiffuse = bgfx::createUniform("u_sdiffuse", bgfx::UniformType::Int1); // sampler2D
+    s_albedo = bgfx::createUniform("s_albedo", bgfx::UniformType::Int1); // sampler2D
+    s_position = bgfx::createUniform("s_position", bgfx::UniformType::Int1); // sampler2D
+    s_normal = bgfx::createUniform("s_normal", bgfx::UniformType::Int1); // sampler2D
+    s_depth = bgfx::createUniform("s_depth", bgfx::UniformType::Int1); // sampler2D
 
     progTest = loadProgram(&g_fileReader, "vs_test", "fs_test");
     progVertShading = loadProgram(&g_fileReader, "vs_vertex_shading", "fs_vertex_shading");
@@ -205,6 +224,8 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
     progDbgColor = loadProgram(&g_fileReader, "vs_dbg_color", "fs_dbg_color");
     progGameFinal = loadProgram(&g_fileReader, "vs_game_final", "fs_game_final");
     progUiFinal = loadProgram(&g_fileReader, "vs_game_final", "fs_ui_final");
+    progGbuffer = loadProgram(&g_fileReader, "vs_gbuffer", "fs_gbuffer");
+    progGbufferInst = loadProgram(&g_fileReader, "vs_gbuffer_inst", "fs_gbuffer");
 
 
     i32 i = 0;
@@ -223,7 +244,6 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
             PosColorVertex::ms_decl
             );
 
-    const bgfx::Caps& caps = *bgfx::getCaps();
     caps_shadowSamplerSupported = (caps.supported & BGFX_CAPS_TEXTURE_COMPARE_LEQUAL) != 0;
 
     const i32 shadowMapSize = 4096;
@@ -323,7 +343,7 @@ void Renderer::deinit()
     bgfx::destroy(progShadowInstance);
 
     bgfx::destroy(u_color);
-    bgfx::destroy(u_sdiffuse);
+    bgfx::destroy(s_albedo);
     bgfx::destroy(u_depthScaleOffset);
 
     bgfx::destroy(fbhGame);
@@ -524,11 +544,17 @@ void Renderer::frame()
 
     bgfx::setState(0
         | BGFX_STATE_WRITE_RGB
+        | BGFX_STATE_BLEND_ALPHA
         );
 
     bgfx::setVertexBuffer(0, vbhScreenQuad, 0, 6);
 
-    bgfx::setTexture(0, u_sdiffuse, bgfx::getTexture(fbhGame, 0));
+    bgfx::setUniform(u_lightMtx, mtxLight0);
+    bgfx::setTexture(0, s_albedo, bgfx::getTexture(fbhGame, 0));
+    bgfx::setTexture(1, s_position, bgfx::getTexture(fbhGame, 1));
+    bgfx::setTexture(2, s_normal, bgfx::getTexture(fbhGame, 2));
+    bgfx::setTexture(3, s_depth, bgfx::getTexture(fbhGame, 3));
+    bgfx::setTexture(4, s_shadowMap, texShadowMap[0]);
     bgfx::submit(ViewID::COMBINE, progGameFinal);
 
     bgfx::setState(0
@@ -538,7 +564,7 @@ void Renderer::frame()
 
     bgfx::setVertexBuffer(0, vbhScreenQuad, 0, 6);
 
-    bgfx::setTexture(0, u_sdiffuse, bgfx::getTexture(fbhUI, 0));
+    bgfx::setTexture(0, s_albedo, bgfx::getTexture(fbhUI, 0));
     bgfx::submit(ViewID::COMBINE, progUiFinal);
 
     // Advance to next frame. Rendering thread will be kicked to
@@ -548,11 +574,9 @@ void Renderer::frame()
 
 void Renderer::drawMesh(MeshHandle hmesh, const mat4& mtxModel, const vec4& color)
 {
-    bgfx::setUniform(u_lightMtx, mtxLight0);
-    bgfx::setTexture(0, s_shadowMap, texShadowMap[0]);
     bgfx::setUniform(u_color, color);
 
-    meshSubmit(hmesh, ViewID::GAME, progMeshShadowed,
+    meshSubmit(hmesh, ViewID::GAME, progGbuffer,
                mtxModel, BGFX_STATE_MASK);
 
     u64 state = 0
@@ -588,9 +612,7 @@ void Renderer::drawCubeInstances(const InstanceData* instData, const i32 cubeCou
             | BGFX_STATE_MSAA
             );
 
-        bgfx::setTexture(0, s_shadowMap, texShadowMap[0]);
-
-        bgfx::submit(ViewID::GAME, progMeshShadowedInstance);
+        bgfx::submit(ViewID::GAME, progGbufferInst);
 
         if(dropShadow) {
             bgfx::setVertexBuffer(0, cubeVbh, 0, 36);
@@ -621,8 +643,7 @@ void Renderer::drawCube(mat4 mtxModel, vec4 color)
         | BGFX_STATE_MSAA
         );
 
-    bgfx::setTexture(0, s_shadowMap, texShadowMap[0]);
-    bgfx::submit(ViewID::GAME, progMeshShadowed);
+    bgfx::submit(ViewID::GAME, progGbuffer);
 
     bgfx::setTransform(mtxModel);
     bgfx::setUniform(u_color, color);

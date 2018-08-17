@@ -92,11 +92,11 @@ void Room::make(vec3 size_, const i32 cubeSize)
             tfCube.scale = {(f32)cubeSize, (f32)cubeSize, 1.f};
             bx::quatIdentity(tfCube.rot);
             cubeTransforms.push_back(tfCube);
-            cubeColors.push(vec4{0.04f, 0.02f, 0.01f, 1.0f});
+            cubeColors.push(vec4{0.4f, 0.3f, 0.2f, 1.0f});
         }
     }
 
-    const vec4 wallColor = {0.012f, 0.011f, 0.01f, 1.0f};
+    const vec4 wallColor = {0.2f, 0.2f, 0.2f, 1.0f};
 
     // walls
     Transform tfWall;
@@ -413,11 +413,15 @@ void GameData::update(f64 delta)
 
     ImGui::End();
 
-    /*ImGui::Begin("Renderer");
+    ImGui::Begin("G-buffer", 0, ImGuiWindowFlags_AlwaysAutoResize);
 
-    ImGui::Image(rdr.texShadowMap, ImVec2(512, 512));
+    ImGui::Image(bgfx::getTexture(rdr.fbhGame, 1), ImVec2(300, 300 * (9.0f/16.0f)));
+    ImGui::SameLine();
+    ImGui::Image(bgfx::getTexture(rdr.fbhGame, 2), ImVec2(300, 300 * (9.0f/16.0f)));
+    ImGui::SameLine();
+    //ImGui::Image(bgfx::getTexture(rdr.fbhGame, 3), ImVec2(300, 300 * (9.0f/16.0f)));
 
-    ImGui::End();*/
+    ImGui::End();
 }
 
 void GameData::render()
