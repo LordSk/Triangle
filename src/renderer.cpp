@@ -180,7 +180,9 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
     // Set view clear state.
     bgfx::setViewClear(ViewID::GAME, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, 0x00000000, 1.0f, 0.f);
     bgfx::setViewClear(ViewID::UI, BGFX_CLEAR_COLOR, 0x00000000, 1.f, 0.f);
-    bgfx::setViewClear(ViewID::COMBINE, BGFX_CLEAR_COLOR, 0x101010ff, 1.0f, 0.f);
+    bgfx::setViewClear(ViewID::COMBINE, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, 0x1c1c1cff, 1.0f, 0.f);
+    bgfx::setViewClear(ViewID::DBG_DRAW, BGFX_CLEAR_NONE, 0x0, 1.0f, 0.f);
+    // DBG_DRAW is on top of everything, dont clear
 
     bgfx::setViewFrameBuffer(ViewID::GAME, fbhGame);
     bgfx::setViewFrameBuffer(ViewID::UI, fbhUI);
@@ -188,6 +190,7 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
     bgfx::setViewName(ViewID::GAME, "Game");
     bgfx::setViewName(ViewID::UI, "ImGui");
     bgfx::setViewName(ViewID::COMBINE, "Combine");
+    bgfx::setViewName(ViewID::DBG_DRAW, "Debug draw");
 
     // Create vertex stream declaration.
     PosColorVertex::init();
@@ -460,8 +463,10 @@ void Renderer::frame()
     bgfx::setViewRect(ViewID::GAME, 0, 0, u16(renderWidth), u16(renderHeight));
     bgfx::setViewRect(ViewID::UI, 0, 0, u16(renderWidth), u16(renderHeight));
     bgfx::setViewRect(ViewID::COMBINE, 0, 0, u16(renderWidth), u16(renderHeight));
+    bgfx::setViewRect(ViewID::DBG_DRAW, 0, 0, u16(renderWidth), u16(renderHeight));
 
     bgfx::setViewTransform(ViewID::GAME, mtxView, mtxProj);
+    bgfx::setViewTransform(ViewID::DBG_DRAW, mtxView, mtxProj);
 
     // shadow map
     static i64 t0 = bx::getHPCounter();
@@ -506,6 +511,7 @@ void Renderer::frame()
     bgfx::touch(ViewID::GAME);
     bgfx::touch(ViewID::UI);
     bgfx::touch(ViewID::COMBINE);
+    bgfx::touch(ViewID::DBG_DRAW);
 
     // origin gizmo
     if(dbgEnableWorldOrigin) {
@@ -519,7 +525,7 @@ void Renderer::frame()
         const f32 transparent[] = {0, 0, 0, 0};
         bgfx::setUniform(u_color, transparent);
         bgfx::setVertexBuffer(0, originVbh, 0, BX_COUNTOF(s_originVertData));
-        bgfx::submit(ViewID::GAME, progDbgColor);
+        bgfx::submit(ViewID::DBG_DRAW, progDbgColor);
     }
 
     // XY grid
@@ -535,15 +541,17 @@ void Renderer::frame()
         bx::mtxTranslate(mtxGrid, -500, -500, 0);
         bgfx::setTransform(mtxGrid);
 
-        const f32 white[] = {0.5, 0.5, 0.5, 1};
+        const f32 white[] = {0.6f, 0.6f, 0.6f, 1};
         bgfx::setUniform(u_color, white);
         bgfx::setVertexBuffer(0, gridVbh, 0, BX_COUNTOF(s_gridLinesVertData));
-        bgfx::submit(ViewID::GAME, progDbgColor);
+        bgfx::submit(ViewID::DBG_DRAW, progDbgColor);
     }
-
 
     bgfx::setState(0
         | BGFX_STATE_WRITE_RGB
+        | BGFX_STATE_WRITE_Z
+        | BGFX_STATE_DEPTH_TEST_LESS
+        | BGFX_STATE_CULL_CW
         | BGFX_STATE_BLEND_ALPHA
         );
 
@@ -559,6 +567,7 @@ void Renderer::frame()
 
     bgfx::setState(0
         | BGFX_STATE_WRITE_RGB
+        | BGFX_STATE_CULL_CW
         | BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_INV_SRC_ALPHA)
         );
 

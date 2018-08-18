@@ -95,4 +95,5 @@ void main()
     
     float light = max(dot(normal, -normalize(u_lightDir.xyz)), 0.0);
     gl_FragColor = vec4(toGamma(visibility * color * light + color * 0.1), color4.a);
+    gl_FragDepth = depth;
 }

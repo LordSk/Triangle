@@ -83,6 +83,7 @@ struct Renderer
             GAME,
             UI,
             COMBINE,
+            DBG_DRAW,
         };
     };
 
