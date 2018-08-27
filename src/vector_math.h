@@ -112,6 +112,11 @@ inline vec3 vec3Norm(vec3 v1)
     return v1 * (1.0f / vec3Len(v1));
 }
 
+inline vec3 vec4ToVec3(vec4 v4)
+{
+    return vec3{v4.x, v4.y, v4.z};
+}
+
 inline vec4 vec4FromVec3(vec3 v3, f32 w)
 {
     return vec4{v3.x, v3.y, v3.z, w};

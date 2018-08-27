@@ -3,6 +3,7 @@
 #include "collision.h"
 #include "mesh_load.h"
 #include "damage.h"
+#include "renderer.h"
 
 //@Component
 struct CTransform : Transform
@@ -105,6 +106,18 @@ struct CHealthCore
     f32 health = 100;
     //
 };
+
+//@Component
+struct CLightPoint
+{
+    Transform tf;
+    LightPoint light;
+};
+
+void updateLightPoint(struct EntityComponentSystem* ecs, CLightPoint* eltList, const i32 count,
+                      const i32* entityId, f64 delta, f64 physLerpAlpha);
+void onDeleteLightPoint(struct EntityComponentSystem* ecs, CLightPoint* eltList, const i32 count,
+                        const i32* entityId, bool8* entDeleteFlag);
 
 void updateHealthCore(struct EntityComponentSystem* ecs, CHealthCore* eltList, const i32 count,
                       const i32* entityId, f64 delta, f64 physLerpAlpha);

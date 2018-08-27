@@ -338,14 +338,6 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
 
     lightPointList.reserve(256);
 
-    LightPoint lp;
-    lp.pos = vec3{50, 30, 1};
-    lp.color = {1, 0, 1};
-    lp.intensity = 1.0;
-    lp.att_linear = 1.5f;
-    lp.att_quadratic = 0.99f;
-    lightPointList.push(lp);
-
     return true;
 }
 
@@ -572,10 +564,8 @@ void Renderer::frame()
         bgfx::submit(ViewID::DBG_DRAW, progDbgColor);
     }
 
+#if 1
     // light pass
-    bgfx::setTexture(0, s_albedo, bgfx::getTexture(fbhGbuffer, 0));
-    bgfx::setTexture(1, s_position, bgfx::getTexture(fbhGbuffer, 1));
-    bgfx::setTexture(2, s_normal, bgfx::getTexture(fbhGbuffer, 2));
     const i32 lightPointCount = lightPointList.count();
     const LightPoint* lightPoints = lightPointList.data();
 
@@ -594,13 +584,10 @@ void Renderer::frame()
         const AABB aabb = {lp.pos - vec3Splat(radius), lp.pos + vec3Splat(radius)};
         const AABB clipSpaceAabb = aabbTransformSpace(aabb, mtxViewProj);
 
-        logAABB(aabb);
-        logAABB(clipSpaceAabb);
-
-        Transform tf;
+        /*Transform tf;
         tf.pos = aabb.bmin;
         tf.scale = aabb.bmax - aabb.bmin;
-        dbgDrawRectLine(tf, vec4FromVec3(lp.color, 1.0));
+        dbgDrawRectLine(tf, vec4FromVec3(lp.color, 1.0));*/
 
         const vec3 c0 = clipSpaceAabb.bmin;
         const vec3 c1 = clipSpaceAabb.bmax;
@@ -647,6 +634,8 @@ void Renderer::frame()
             *indices++ = 3;
             *indices++ = 2;
 
+            bgfx::setTexture(1, s_position, bgfx::getTexture(fbhGbuffer, 1));
+            bgfx::setTexture(2, s_normal, bgfx::getTexture(fbhGbuffer, 2));
             const vec4 lightPos4 = vec4FromVec3(lp.pos, 1.0);
             bgfx::setUniform(u_lightPos, lightPos4);
             bgfx::setUniform(u_lightColor, lp.color);
@@ -664,6 +653,8 @@ void Renderer::frame()
             bgfx::submit(ViewID::LIGHT, progLightPass);
         }
     }
+
+#endif
 
     bgfx::setState(0
         | BGFX_STATE_WRITE_RGB

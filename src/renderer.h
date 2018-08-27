@@ -68,11 +68,11 @@ struct ShadowMapDirectional
 
 struct LightPoint
 {
-    vec3 pos;
-    vec3 color;
-    f32 intensity;
-    f32 att_linear;
-    f32 att_quadratic;
+    vec3 pos = {};
+    vec3 color = {1, 1, 1};
+    f32 intensity = 1.0f;
+    f32 att_linear = 0.1f;
+    f32 att_quadratic = 0.1f;
 };
 
 struct Renderer

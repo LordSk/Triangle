@@ -215,6 +215,7 @@ bool GameData::init()
     CShipControllerHuman& playerController = ecs.addCompShipControllerHuman(playerEid);
     CPlayerShipMovement& playerMovt = ecs.addCompPlayerShipMovement(playerEid);
     CShipWeapon& playerWeapon = ecs.addCompShipWeapon(playerEid);
+    //CLightPoint& playerLight =  ecs.addCompLightPoint(playerEid);
 
     playerTf.pos = {10, 10, 0};
     playerTf.scale = {0.5f, 0.5f, 0.5f};
@@ -239,6 +240,9 @@ bool GameData::init()
     playerWeapon.rateOfFire = 10;
     playerWeapon.hMeshBullet = meshBullet1;
     playerWeapon.meshColor = vec4{1, 0, 0, 1};
+
+    /*playerLight.light.intensity = 10.f;
+    playerLight.light.pos.z = 2.f;*/
     // --------------------
 
 
@@ -438,16 +442,6 @@ void GameData::update(f64 delta)
     ImGui::SameLine();
     ImGui::Image(rdr.fbTexLight, ImVec2(300, 300 * (9.0f/16.0f)));
     ImGui::SameLine();
-
-    ImGui::End();
-
-    ImGui::Begin("Test light");
-    LightPoint& lp = rdr.lightPointList[0];
-
-    ImGui::ColorEdit3("color", lp.color.data);
-    ImGui::InputFloat("intensity", &lp.intensity);
-    ImGui::InputFloat("linear", &lp.att_linear);
-    ImGui::InputFloat("quadratic", &lp.att_quadratic);
 
     ImGui::End();
 }

@@ -331,3 +331,26 @@ void onDeleteBulletLogic(EntityComponentSystem* ecs, CBulletLogic* eltList, cons
 {
 
 }
+
+void updateLightPoint(EntityComponentSystem* ecs, CLightPoint* eltList, const i32 count, const i32* entityId,
+                      f64 delta, f64 physLerpAlpha)
+{
+    Renderer& rdr = getRenderer();
+    rdr.lightPointList.clear();
+
+    for(i32 i = 0; i < count; i++) {
+        const i32 eid = entityId[i];
+        CLightPoint& comp = eltList[i];
+        CTransform& tf = ecs->getCompTransform(eid);
+
+        LightPoint lp = comp.light;
+        lp.pos += tf.pos;
+        rdr.lightPointList.push(lp);
+    }
+}
+
+void onDeleteLightPoint(EntityComponentSystem* ecs, CLightPoint* eltList, const i32 count,
+                        const i32* entityId, bool8* entDeleteFlag)
+{
+
+}

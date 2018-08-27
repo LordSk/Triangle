@@ -170,6 +170,7 @@ void updateShipWeapon(EntityComponentSystem* ecs, CShipWeapon* eltList, const i3
             CDmgZone& dmgBody = ecs->addCompDmgZone(bid);
             CDrawMesh& meshComp = ecs->addCompDrawMesh(bid);
             CBulletLogic& bulletLogic = ecs->addCompBulletLogic(bid);
+            CLightPoint& bulletLight =  ecs->addCompLightPoint(bid);
 
             CTransform& weapTf = ecs->getCompTransform(eid); // Note: re-get the component since we added
             // a Transform and then might have realloced ArraySparse data
@@ -202,6 +203,8 @@ void updateShipWeapon(EntityComponentSystem* ecs, CShipWeapon* eltList, const i3
             bx::quatRotateZ(rotZ, -bx::kPiHalf);
             bx::quatMul(meshComp.tf.rot, baseRot, rotZ);
             meshComp.tf.scale = vec3Splat(0.5);
+
+            bulletLight.light.color = vec4ToVec3(weap.meshColor);
         }
     }
 }
