@@ -7,6 +7,7 @@ SAMPLER2D(s_position, 1);
 SAMPLER2D(s_normal, 2);
 SAMPLER2D(s_depth, 3);
 SAMPLER2DSHADOW(s_shadowMap, 4);
+SAMPLER2D(s_lightMap, 5);
 #define Sampler sampler2DShadow
 
 uniform mat4 u_lightMtx;
@@ -87,6 +88,7 @@ void main()
     float depth = texture2D(s_depth, v_texcoord0).r;
     vec4 texNormal = texture2D(s_normal, v_texcoord0);
     vec3 normal = texNormal.xyz * 2.0 - 1.0 * texNormal.w;
+    vec4 lightMap = texture2D(s_lightMap, v_texcoord0);
     
     vec4 lsPos = mul(u_lightMtx, vec4(position, 1.0));
     
@@ -94,6 +96,7 @@ void main()
 	float visibility = PCF(s_shadowMap, lsPos, 0.005, texelSize);
     
     float light = max(dot(normal, -normalize(u_lightDir.xyz)), 0.0);
-    gl_FragColor = vec4(toGamma(visibility * color * light + color * 0.1), color4.a);
+    //gl_FragColor = vec4(toGamma(visibility * (color * lightMap.xyz) * light + color * 0.001), color4.a);
+    gl_FragColor = vec4(toGamma(color * lightMap.xyz + color * 0.001), color4.a);
     gl_FragDepth = depth;
 }

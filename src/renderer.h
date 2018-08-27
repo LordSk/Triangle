@@ -66,6 +66,15 @@ struct ShadowMapDirectional
     AABB worldArea;
 };
 
+struct LightPoint
+{
+    vec3 pos;
+    vec3 color;
+    f32 intensity;
+    f32 att_linear;
+    f32 att_quadratic;
+};
+
 struct Renderer
 {
     struct ViewID
@@ -81,9 +90,10 @@ struct Renderer
             SHADOW_MAP7,
 
             GAME,
-            UI,
+            LIGHT,
             COMBINE,
             DBG_DRAW,
+            UI,
         };
     };
 
@@ -103,6 +113,7 @@ struct Renderer
     bgfx::ProgramHandle progMeshShadowedInstance;
     bgfx::ProgramHandle progGbuffer;
     bgfx::ProgramHandle progGbufferInst;
+    bgfx::ProgramHandle progLightPass;
 
     bgfx::UniformHandle u_color;
     bgfx::UniformHandle s_albedo;
@@ -111,20 +122,25 @@ struct Renderer
     bgfx::UniformHandle s_depth;
     bgfx::UniformHandle u_depthScaleOffset;
     bgfx::UniformHandle s_shadowMap;
+    bgfx::UniformHandle s_lightMap;
     bgfx::UniformHandle u_lightPos;
     bgfx::UniformHandle u_lightMtx;
     bgfx::UniformHandle u_lightDir;
+    bgfx::UniformHandle u_lightColor;
+    bgfx::UniformHandle u_lightLinearQuadraticIntensity;
 
     bgfx::VertexBufferHandle cubeVbh;
     bgfx::VertexBufferHandle originVbh;
     bgfx::VertexBufferHandle gridVbh;
     bgfx::VertexBufferHandle vbhScreenQuad;
 
-    bgfx::FrameBufferHandle fbhGame;
-    bgfx::FrameBufferHandle fbhUI;
+    bgfx::FrameBufferHandle fbhGbuffer;
 
     bgfx::FrameBufferHandle fbhShadowMap[SHADOW_MAP_COUNT_MAX];
     bgfx::TextureHandle texShadowMap[SHADOW_MAP_COUNT_MAX];
+
+    bgfx::TextureHandle fbTexLight;
+    bgfx::FrameBufferHandle fbhLight;
 
     bool8 caps_shadowSamplerSupported;
 
@@ -134,6 +150,8 @@ struct Renderer
 
     Array<Camera> cameraList;
     i32 currentCamId = 0;
+
+    Array<LightPoint> lightPointList;
 
     bool dbgEnableGrid = true;
     bool dbgEnableWorldOrigin = true;

@@ -3,6 +3,7 @@
 #include "base.h"
 #include <bx/math.h>
 #include <math.h>
+#include <float.h>
 
 inline f32 signf(f32 f)
 {
@@ -111,6 +112,11 @@ inline vec3 vec3Norm(vec3 v1)
     return v1 * (1.0f / vec3Len(v1));
 }
 
+inline vec4 vec4FromVec3(vec3 v3, f32 w)
+{
+    return vec4{v3.x, v3.y, v3.z, w};
+}
+
 union vec2
 {
     struct { f32 x, y; };
@@ -130,6 +136,11 @@ union vec2
         return *this;
     }
 };
+
+inline vec2 vec2Splat(f32 one)
+{
+    return vec2{one, one};
+}
 
 inline vec2 operator+(const vec2& v1, const vec2& v2) {
     return vec2{ v1.x + v2.x, v1.y + v2.y };
@@ -297,3 +308,54 @@ struct AABB
     vec3 bmin;
     vec3 bmax;
 };
+
+inline AABB aabbTransformSpace(const AABB& aabb, const mat4& mtxSpace)
+{
+    const vec3 bmin = aabb.bmin;
+    const vec3 bmax = aabb.bmax;
+
+    vec3 points[8] = {
+        bmin,
+        vec3{bmax.x, bmin.y, bmin.z},
+        vec3{bmin.x, bmax.y, bmin.z},
+        vec3{bmax.x, bmax.y, bmin.z},
+
+        vec3{bmin.x, bmin.y, bmax.z},
+        vec3{bmax.x, bmin.y, bmax.z},
+        vec3{bmin.x, bmax.y, bmax.z},
+        bmax,
+    };
+
+    for(i32 i = 0; i < 8; i++) {
+        bx::vec3MulMtxH(points[i], points[i], mtxSpace);
+    }
+
+    f32 minX = FLT_MAX;
+    f32 minY = FLT_MAX;
+    f32 minZ = FLT_MAX;
+    f32 maxX = -FLT_MAX;
+    f32 maxY = -FLT_MAX;
+    f32 maxZ = -FLT_MAX;
+
+    for(i32 i = 0; i < 8; i++) {
+        minX = mmin(points[i].x, minX);
+        maxX = mmax(points[i].x, maxX);
+        minY = mmin(points[i].y, minY);
+        maxY = mmax(points[i].y, maxY);
+        minZ = mmin(points[i].z, minZ);
+        maxZ = mmax(points[i].z, maxZ);
+    }
+
+    AABB out = {
+        vec3{minX, minY, minZ},
+        vec3{maxX, maxY, maxZ},
+    };
+    return out;
+}
+
+inline void logAABB(const AABB& aabb)
+{
+    LOG("aabb={%.2f, %.2f, %.2f},{%.2f, %.2f, %.2f}",
+        aabb.bmin.x, aabb.bmin.y, aabb.bmin.z,
+        aabb.bmax.x, aabb.bmax.y, aabb.bmax.z);
+}

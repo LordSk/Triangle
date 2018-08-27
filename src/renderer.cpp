@@ -12,7 +12,7 @@ static bx::FileWriter g_fileWriter;
 bgfx::VertexDecl PosColorVertex::ms_decl;
 bgfx::VertexDecl PosUvVertex::decl;
 
-static const PosUvVertex s_screenQuadVertData[6] = {
+static const PosUvVertex s_wholeScreenQuadVertData[6] = {
     { -1.0f, -1.0f, 0, 0, 1 },
     {  1.0f, -1.0f, 0, 1, 1 },
     {  1.0f,  1.0f, 0, 1, 0 },
@@ -160,34 +160,40 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
     fbTexGame[3] = bgfx::createTexture2D(u16(renderWidth), u16(renderHeight), false,
                                          1, bgfx::TextureFormat::D24,
                                          samplerFlags);
-    fbhGame = bgfx::createFrameBuffer(arr_count(fbTexGame), fbTexGame, true);
+    fbhGbuffer = bgfx::createFrameBuffer(arr_count(fbTexGame), fbTexGame, true);
 
-    if(!bgfx::isValid(fbhGame)) {
+    // light frame buffer
+    // TODO: make this RGBA32F and normalize it to
+    // RGBA8 (to make very bright lights darkening the rest of the screen)
+    fbTexLight = bgfx::createTexture2D(u16(renderWidth), u16(renderHeight), false,
+                                       1, bgfx::TextureFormat::RGBA8,
+                                       BGFX_TEXTURE_RT);
+    fbhLight = bgfx::createFrameBuffer(1, &fbTexLight, true);
+
+
+    if(!bgfx::isValid(fbhGbuffer)) {
         LOG("ERROR> could not create game frame buffer");
         return false;
     }
 
-    fbhUI = bgfx::createFrameBuffer(
-                  renderWidth, renderHeight,
-                  bgfx::TextureFormat::RGBA8,
-                  (samplerFlags|BGFX_TEXTURE_RT_MSAA_X16));
-
-    if(!bgfx::isValid(fbhUI)) {
-        LOG("ERROR> could not create UI frame buffer");
+    if(!bgfx::isValid(fbhLight)) {
+        LOG("ERROR> could not create light_pass frame buffer");
         return false;
     }
 
     // Set view clear state.
     bgfx::setViewClear(ViewID::GAME, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, 0x00000000, 1.0f, 0.f);
-    bgfx::setViewClear(ViewID::UI, BGFX_CLEAR_COLOR, 0x00000000, 1.f, 0.f);
+    bgfx::setViewClear(ViewID::LIGHT, BGFX_CLEAR_COLOR, 0x000000ff, 1.0f, 0.f);
+    bgfx::setViewClear(ViewID::UI, BGFX_CLEAR_NONE, 0x0, 1.f, 0.f);
     bgfx::setViewClear(ViewID::COMBINE, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH, 0x1c1c1cff, 1.0f, 0.f);
     bgfx::setViewClear(ViewID::DBG_DRAW, BGFX_CLEAR_NONE, 0x0, 1.0f, 0.f);
-    // DBG_DRAW is on top of everything, dont clear
+    // UI, DBG_DRAW is on top of everything, dont clear
 
-    bgfx::setViewFrameBuffer(ViewID::GAME, fbhGame);
-    bgfx::setViewFrameBuffer(ViewID::UI, fbhUI);
+    bgfx::setViewFrameBuffer(ViewID::GAME, fbhGbuffer);
+    bgfx::setViewFrameBuffer(ViewID::LIGHT, fbhLight);
 
     bgfx::setViewName(ViewID::GAME, "Game");
+    bgfx::setViewName(ViewID::LIGHT, "Light");
     bgfx::setViewName(ViewID::UI, "ImGui");
     bgfx::setViewName(ViewID::COMBINE, "Combine");
     bgfx::setViewName(ViewID::DBG_DRAW, "Debug draw");
@@ -209,7 +215,7 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
             );
 
     vbhScreenQuad = bgfx::createVertexBuffer(
-                        bgfx::makeRef(s_screenQuadVertData, sizeof(s_screenQuadVertData)),
+                        bgfx::makeRef(s_wholeScreenQuadVertData, sizeof(s_wholeScreenQuadVertData)),
                         PosUvVertex::decl
                         );
 
@@ -229,6 +235,7 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
     progUiFinal = loadProgram(&g_fileReader, "vs_game_final", "fs_ui_final");
     progGbuffer = loadProgram(&g_fileReader, "vs_gbuffer", "fs_gbuffer");
     progGbufferInst = loadProgram(&g_fileReader, "vs_gbuffer_inst", "fs_gbuffer");
+    progLightPass = loadProgram(&g_fileReader, "vs_light_quad", "fs_light_quad");
 
 
     i32 i = 0;
@@ -306,9 +313,13 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
 
     u_depthScaleOffset = bgfx::createUniform("u_depthScaleOffset",  bgfx::UniformType::Vec4);
     s_shadowMap = bgfx::createUniform("s_shadowMap",  bgfx::UniformType::Int1);
+    s_lightMap = bgfx::createUniform("s_lightMap",  bgfx::UniformType::Int1);
     u_lightPos = bgfx::createUniform("u_lightPos",  bgfx::UniformType::Vec4);
     u_lightMtx = bgfx::createUniform("u_lightMtx",  bgfx::UniformType::Mat4);
     u_lightDir = bgfx::createUniform("u_lightDir",  bgfx::UniformType::Vec4);
+    u_lightColor = bgfx::createUniform("u_lightColor",  bgfx::UniformType::Vec4);
+    u_lightLinearQuadraticIntensity = bgfx::createUniform("u_lightLinearQuadraticIntensity",
+                                                          bgfx::UniformType::Vec4);
 
     if(!bgfx::isValid(s_shadowMap) ||
        !bgfx::isValid(u_lightPos) ||
@@ -324,6 +335,16 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
         depthScaleOffset[1] = 0.5f;
     }
     bgfx::setUniform(u_depthScaleOffset, depthScaleOffset);
+
+    lightPointList.reserve(256);
+
+    LightPoint lp;
+    lp.pos = vec3{50, 30, 1};
+    lp.color = {1, 0, 1};
+    lp.intensity = 1.0;
+    lp.att_linear = 1.5f;
+    lp.att_quadratic = 0.99f;
+    lightPointList.push(lp);
 
     return true;
 }
@@ -347,10 +368,12 @@ void Renderer::deinit()
 
     bgfx::destroy(u_color);
     bgfx::destroy(s_albedo);
+    bgfx::destroy(s_position);
+    bgfx::destroy(s_normal);
+    bgfx::destroy(s_depth);
     bgfx::destroy(u_depthScaleOffset);
 
-    bgfx::destroy(fbhGame);
-    bgfx::destroy(fbhUI);
+    bgfx::destroy(fbhGbuffer);
 
     for(i32 i = 0; i < SHADOW_MAP_COUNT_MAX; i++) {
          bgfx::destroy(fbhShadowMap[i]);
@@ -461,6 +484,7 @@ void Renderer::setupDirectionalShadowMap(const ShadowMapDirectional& light, cons
 void Renderer::frame()
 {
     bgfx::setViewRect(ViewID::GAME, 0, 0, u16(renderWidth), u16(renderHeight));
+    bgfx::setViewRect(ViewID::LIGHT, 0, 0, u16(renderWidth), u16(renderHeight));
     bgfx::setViewRect(ViewID::UI, 0, 0, u16(renderWidth), u16(renderHeight));
     bgfx::setViewRect(ViewID::COMBINE, 0, 0, u16(renderWidth), u16(renderHeight));
     bgfx::setViewRect(ViewID::DBG_DRAW, 0, 0, u16(renderWidth), u16(renderHeight));
@@ -509,6 +533,7 @@ void Renderer::frame()
     // This dummy draw call is here to make sure that view x is cleared
     // if no other draw calls are submitted to view x.
     bgfx::touch(ViewID::GAME);
+    bgfx::touch(ViewID::LIGHT);
     bgfx::touch(ViewID::UI);
     bgfx::touch(ViewID::COMBINE);
     bgfx::touch(ViewID::DBG_DRAW);
@@ -547,6 +572,99 @@ void Renderer::frame()
         bgfx::submit(ViewID::DBG_DRAW, progDbgColor);
     }
 
+    // light pass
+    bgfx::setTexture(0, s_albedo, bgfx::getTexture(fbhGbuffer, 0));
+    bgfx::setTexture(1, s_position, bgfx::getTexture(fbhGbuffer, 1));
+    bgfx::setTexture(2, s_normal, bgfx::getTexture(fbhGbuffer, 2));
+    const i32 lightPointCount = lightPointList.count();
+    const LightPoint* lightPoints = lightPointList.data();
+
+    mat4 mtxViewProj;
+    bx::mtxMul(mtxViewProj, mtxView, mtxProj);
+
+    for(i32 i = 0; i < lightPointCount; i++) {
+        const LightPoint& lp = lightPoints[i];
+        const f32 constant = 1.0f;
+        const f32 linear = lp.att_linear;
+        const f32 quadratic = lp.att_quadratic;
+        const f32 lightMax = mmax(mmax(lp.color.x, lp.color.y), lp.color.z) *
+                             lp.intensity;
+        const f32 radius = (-linear +  sqrtf(linear * linear - 4 * quadratic *
+                                             (constant - (256.0 / 5.0) * lightMax))) / (2 * quadratic);
+        const AABB aabb = {lp.pos - vec3Splat(radius), lp.pos + vec3Splat(radius)};
+        const AABB clipSpaceAabb = aabbTransformSpace(aabb, mtxViewProj);
+
+        logAABB(aabb);
+        logAABB(clipSpaceAabb);
+
+        Transform tf;
+        tf.pos = aabb.bmin;
+        tf.scale = aabb.bmax - aabb.bmin;
+        dbgDrawRectLine(tf, vec4FromVec3(lp.color, 1.0));
+
+        const vec3 c0 = clipSpaceAabb.bmin;
+        const vec3 c1 = clipSpaceAabb.bmax;
+        const vec2 uv0 = (vec2{c0.x, -c0.y} + vec2Splat(1.0f)) * 0.5f;
+        const vec2 uv1 = (vec2{c1.x, -c1.y} + vec2Splat(1.0f)) * 0.5f;
+
+        bgfx::TransientVertexBuffer tvb;
+        bgfx::TransientIndexBuffer tib;
+        if(bgfx::allocTransientBuffers(&tvb, PosUvVertex::decl, 4, &tib, 6)) {
+            PosUvVertex* vertex = (PosUvVertex*)tvb.data;
+            vertex->x = c0.x;
+            vertex->y = c0.y;
+            vertex->z = 0.0f;
+            vertex->u = uv0.x;
+            vertex->v = uv0.y;
+            ++vertex;
+
+            vertex->x = c1.x;
+            vertex->y = c0.y;
+            vertex->z = 0.0f;
+            vertex->u = uv1.x;
+            vertex->v = uv0.y;
+            ++vertex;
+
+            vertex->x = c0.x;
+            vertex->y = c1.y;
+            vertex->z = 0.0f;
+            vertex->u = uv0.x;
+            vertex->v = uv1.y;
+            ++vertex;
+
+            vertex->x = c1.x;
+            vertex->y = c1.y;
+            vertex->z = 0.0f;
+            vertex->u = uv1.x;
+            vertex->v = uv1.y;
+            ++vertex;
+
+            uint16_t* indices = (uint16_t*)tib.data;
+            *indices++ = 0;
+            *indices++ = 1;
+            *indices++ = 3;
+            *indices++ = 0;
+            *indices++ = 3;
+            *indices++ = 2;
+
+            const vec4 lightPos4 = vec4FromVec3(lp.pos, 1.0);
+            bgfx::setUniform(u_lightPos, lightPos4);
+            bgfx::setUniform(u_lightColor, lp.color);
+            const vec4 lightLinearQuadraticIntensity = vec4{lp.att_linear, lp.att_quadratic,
+                                                         lp.intensity, 1.0};
+            bgfx::setUniform(u_lightLinearQuadraticIntensity, lightLinearQuadraticIntensity);
+
+            bgfx::setVertexBuffer(0, &tvb);
+            bgfx::setIndexBuffer(&tib);
+
+            bgfx::setState(0
+                | BGFX_STATE_WRITE_RGB
+                | BGFX_STATE_BLEND_ADD
+                );
+            bgfx::submit(ViewID::LIGHT, progLightPass);
+        }
+    }
+
     bgfx::setState(0
         | BGFX_STATE_WRITE_RGB
         | BGFX_STATE_WRITE_Z
@@ -558,23 +676,13 @@ void Renderer::frame()
     bgfx::setVertexBuffer(0, vbhScreenQuad, 0, 6);
 
     bgfx::setUniform(u_lightMtx, mtxLight0);
-    bgfx::setTexture(0, s_albedo, bgfx::getTexture(fbhGame, 0));
-    bgfx::setTexture(1, s_position, bgfx::getTexture(fbhGame, 1));
-    bgfx::setTexture(2, s_normal, bgfx::getTexture(fbhGame, 2));
-    bgfx::setTexture(3, s_depth, bgfx::getTexture(fbhGame, 3));
+    bgfx::setTexture(0, s_albedo, bgfx::getTexture(fbhGbuffer, 0));
+    bgfx::setTexture(1, s_position, bgfx::getTexture(fbhGbuffer, 1));
+    bgfx::setTexture(2, s_normal, bgfx::getTexture(fbhGbuffer, 2));
+    bgfx::setTexture(3, s_depth, bgfx::getTexture(fbhGbuffer, 3));
     bgfx::setTexture(4, s_shadowMap, texShadowMap[0]);
+    bgfx::setTexture(5, s_lightMap, fbTexLight);
     bgfx::submit(ViewID::COMBINE, progGameFinal);
-
-    bgfx::setState(0
-        | BGFX_STATE_WRITE_RGB
-        | BGFX_STATE_CULL_CW
-        | BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_INV_SRC_ALPHA)
-        );
-
-    bgfx::setVertexBuffer(0, vbhScreenQuad, 0, 6);
-
-    bgfx::setTexture(0, s_albedo, bgfx::getTexture(fbhUI, 0));
-    bgfx::submit(ViewID::COMBINE, progUiFinal);
 
     // Advance to next frame. Rendering thread will be kicked to
     // process submitted rendering primitives.

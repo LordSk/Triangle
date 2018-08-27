@@ -44,11 +44,20 @@ struct CameraFreeFlight
         bool8 right;
         bool8 up;
         bool8 down;
+        i32 speed;
     } input = {};
 
     void handleEvent(const SDL_Event& event);
 
     inline void applyInput(f64 delta) {
+        if(input.speed > 0) {
+            speed *= 1.1;
+        }
+        else if(input.speed < 0) {
+            speed *= 0.9;
+        }
+        input.speed = 0;
+
         vec3 right;
         bx::vec3Cross(right, dir, up);
         bx::vec3Norm(right, right);

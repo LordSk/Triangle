@@ -44,23 +44,38 @@ void CameraFreeFlight::handleEvent(const SDL_Event& event)
         return;
     }
 
+    if(event.type == SDL_MOUSEWHEEL) {
+        i32 w = event.wheel.y;
+        input.speed = w;
+        return;
+    }
+
     if(event.type == SDL_MOUSEMOTION) {
         // TODO: move this to applyInput
-        yaw = 0;
-        pitch = 0;
+        //yaw = 0;
+        //pitch = 0;
         yaw += event.motion.xrel / (bx::kPi2 * 100.0);
         pitch += event.motion.yrel / (bx::kPi2 * 100.0);
+        if(pitch > bx::kPiHalf) {
+            pitch = bx::kPiHalf - 0.001;
+        }
+        else if(pitch < -bx::kPiHalf) {
+            pitch = -bx::kPiHalf + 0.001;
+        }
+
+        quat qyaw;
+        bx::quatRotateAxis(qyaw, up, yaw);
+        dir = {1, 0, 0};
+        bx::vec3MulQuat(dir, dir, qyaw);
+        bx::vec3Norm(dir, dir);
 
         vec3 right;
         bx::vec3Cross(right, dir, up);
-        quat qyaw;
+        bx::vec3Norm(right, right);
+
         quat qpitch;
-        bx::quatRotateAxis(qyaw, up, yaw);
         bx::quatRotateAxis(qpitch, right, pitch);
-        bx::quatMul(rot, qyaw, qpitch);
-        bx::quatNorm(rot, rot);
-        //dir = {1, 0, 0};
-        bx::vec3MulQuat(dir, dir, rot);
+        bx::vec3MulQuat(dir, dir, qpitch);
         bx::vec3Norm(dir, dir);
         return;
     }
@@ -415,11 +430,24 @@ void GameData::update(f64 delta)
 
     ImGui::Begin("G-buffer", 0, ImGuiWindowFlags_AlwaysAutoResize);
 
-    ImGui::Image(bgfx::getTexture(rdr.fbhGame, 1), ImVec2(300, 300 * (9.0f/16.0f)));
+    ImGui::Image(bgfx::getTexture(rdr.fbhGbuffer, 0), ImVec2(300, 300 * (9.0f/16.0f)));
     ImGui::SameLine();
-    ImGui::Image(bgfx::getTexture(rdr.fbhGame, 2), ImVec2(300, 300 * (9.0f/16.0f)));
+    ImGui::Image(bgfx::getTexture(rdr.fbhGbuffer, 1), ImVec2(300, 300 * (9.0f/16.0f)));
     ImGui::SameLine();
-    //ImGui::Image(bgfx::getTexture(rdr.fbhGame, 3), ImVec2(300, 300 * (9.0f/16.0f)));
+    ImGui::Image(bgfx::getTexture(rdr.fbhGbuffer, 2), ImVec2(300, 300 * (9.0f/16.0f)));
+    ImGui::SameLine();
+    ImGui::Image(rdr.fbTexLight, ImVec2(300, 300 * (9.0f/16.0f)));
+    ImGui::SameLine();
+
+    ImGui::End();
+
+    ImGui::Begin("Test light");
+    LightPoint& lp = rdr.lightPointList[0];
+
+    ImGui::ColorEdit3("color", lp.color.data);
+    ImGui::InputFloat("intensity", &lp.intensity);
+    ImGui::InputFloat("linear", &lp.att_linear);
+    ImGui::InputFloat("quadratic", &lp.att_quadratic);
 
     ImGui::End();
 }
