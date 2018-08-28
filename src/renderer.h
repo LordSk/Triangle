@@ -72,8 +72,9 @@ struct LightPoint
     vec3 color1 = {1, 1, 1};
     vec3 color2 = {0, 0, 0};
     f32 intensity = 1.0f;
-    f32 att_linear = 0.1f;
-    f32 att_quadratic = 0.1f;
+    f32 radius = 30.f;
+    f32 slope = 0.5f;
+    f32 falloff = 2.f; // power (default: quadratic)
 };
 
 struct Renderer
@@ -132,7 +133,7 @@ struct Renderer
     bgfx::UniformHandle u_lightDir;
     bgfx::UniformHandle u_lightColor1;
     bgfx::UniformHandle u_lightColor2;
-    bgfx::UniformHandle u_lightLinearQuadraticIntensity;
+    bgfx::UniformHandle u_lightParams;
     bgfx::UniformHandle u_exposure;
 
     bgfx::VertexBufferHandle cubeVbh;
@@ -165,7 +166,8 @@ struct Renderer
     bool dbgEnableGrid = false;
     bool dbgEnableWorldOrigin = false;
     bool dbgEnableDbgPhysics = false;
-    f32 dbgExposure = 1.0f;
+    bool dbgLightBoundingBox = false;
+    f32 dbgExposure = 2.0f;
 
     bool init(i32 renderWidth_, i32 renderHeight_);
     void deinit();

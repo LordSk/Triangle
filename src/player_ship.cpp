@@ -207,8 +207,8 @@ void updateShipWeapon(EntityComponentSystem* ecs, CShipWeapon* eltList, const i3
             vec3 color = vec4ToVec3(weap.meshColor);
             bulletLight.light.color1 = vec3Norm(color + vec3Splat(0.2));
             bulletLight.light.color2 = color;
-            bulletLight.light.att_linear = 0;
-            bulletLight.light.att_quadratic = 0.3;
+            bulletLight.light.radius = 10.f;
+            bulletLight.light.slope = 0;
         }
     }
 }

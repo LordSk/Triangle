@@ -8,7 +8,7 @@ SAMPLER2D(s_normal, 2);
 uniform vec4 u_lightPos;
 uniform vec4 u_lightColor1;
 uniform vec4 u_lightColor2;
-uniform vec4 u_lightLinearQuadraticIntensity;
+uniform vec4 u_lightParams;
 
 void main()
 {
@@ -19,12 +19,14 @@ void main()
     vec3 normal = texNormal.xyz * 2.0 - 1.0 * texNormal.w;
     vec3 lightDir = normalize(u_lightPos.xyz - position);
     float distance = length(u_lightPos.xyz - position);
-    float linear_ = u_lightLinearQuadraticIntensity.x;
-    float quadratic = u_lightLinearQuadraticIntensity.y;
-    float intensity = u_lightLinearQuadraticIntensity.z;
+    float intensity = u_lightParams.x;
+    float radius = u_lightParams.y;
+    float slope = u_lightParams.z * 2.0 - 1.0;
+    float falloff = u_lightParams.w;
     
-    float attenuation = 1.0 / (1.0 + linear_ * distance + quadratic * (distance * distance));
+    float attenuation = pow(max((radius - distance), 0.0) / radius, falloff);
+    float a = clamp(attenuation - slope, 0.0, 1.0);
+    vec3 colorMixed = color1 * a + color2 * (1.0 - a);
     float shadowed = max(dot(normal, lightDir), 0.0);
-    gl_FragColor = vec4((color1 * attenuation + color2 * (1.0f - attenuation)) * attenuation * intensity * shadowed, 1.0);
-    //gl_FragColor = vec4(color, 1.0);
+    gl_FragColor = vec4(colorMixed * attenuation * intensity * shadowed, 1.0);
 }

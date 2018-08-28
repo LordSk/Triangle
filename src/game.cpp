@@ -244,12 +244,14 @@ bool GameData::init()
     playerLight.light.color1 = {1, 0.1f, 0.1f};
     playerLight.light.color2 = {1, 0, 0};
     playerLight.light.intensity = 2.f;
-    playerLight.light.pos.z = 2.f;
+    playerLight.light.radius = 20.f;
+    playerLight.light.slope = 0.5f;
+    playerLight.light.pos.z = 1.f;
     // --------------------
 
 
     // create basic enemies
-    for(i32 i = 0; i < 5; ++i) {
+    for(i32 i = 0; i < 20; ++i) {
         const i32 eid = ecs.createEntity("BasicEnemy");
         CTransform& tf = ecs.addCompTransform(eid);
         CPhysBody& physBody = ecs.addCompPhysBody(eid);
@@ -342,8 +344,9 @@ void GameData::componentDoUi(const i32 eid, const u64 compBit)
             ImGui::ColorEdit3("color1", lp.color1.data);
             ImGui::ColorEdit3("color2", lp.color2.data);
             ImGui::SliderFloat("intensity", &lp.intensity, 0.001, 100.0);
-            ImGui::SliderFloat("att_linear", &lp.att_linear, 0.0001, 10.0, "%.5f");
-            ImGui::SliderFloat("att_quadratic", &lp.att_quadratic, 0.0001, 10.0, "%.5f");
+            ImGui::SliderFloat("radius", &lp.radius, 0.01, 200.0, "%.3f");
+            ImGui::SliderFloat("slope", &lp.slope, 0.0, 1.0, "%.3f");
+            ImGui::SliderFloat("falloff", &lp.falloff, 0.01, 5.0, "%.3f");
         } break;
     }
 }

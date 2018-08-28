@@ -232,6 +232,8 @@ void updateUI(f64 delta)
     // ui code here
     //im::ShowDemoWindow();
 
+    Renderer& rdr = getRenderer();
+
     im::Begin("Debug");
 
     const char* comboCameras[] = { "Free flight", "Follow player" };
@@ -241,6 +243,7 @@ void updateUI(f64 delta)
     im::Checkbox("Enable world origin", &renderer.dbgEnableWorldOrigin);
     im::Checkbox("Enable debug physics", &renderer.dbgEnableDbgPhysics);
     im::Checkbox("Enable debug damage zones", &game.dbgEnableDmgZones);
+    im::Checkbox("Enable light bound boxes", &rdr.dbgLightBoundingBox);
 
     im::End();
 

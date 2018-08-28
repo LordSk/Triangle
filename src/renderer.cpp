@@ -337,8 +337,7 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
     u_lightDir = bgfx::createUniform("u_lightDir",  bgfx::UniformType::Vec4);
     u_lightColor1 = bgfx::createUniform("u_lightColor1",  bgfx::UniformType::Vec4);
     u_lightColor2 = bgfx::createUniform("u_lightColor2",  bgfx::UniformType::Vec4);
-    u_lightLinearQuadraticIntensity = bgfx::createUniform("u_lightLinearQuadraticIntensity",
-                                                          bgfx::UniformType::Vec4);
+    u_lightParams = bgfx::createUniform("u_lightParams", bgfx::UniformType::Vec4);
     u_exposure = bgfx::createUniform("u_exposure",  bgfx::UniformType::Vec4);
 
     if(!bgfx::isValid(s_shadowMap) ||
@@ -596,20 +595,23 @@ void Renderer::frame()
 
     for(i32 i = 0; i < lightPointCount; i++) {
         const LightPoint& lp = lightPoints[i];
-        const f32 constant = 1.0f;
-        const f32 linear = lp.att_linear;
-        const f32 quadratic = lp.att_quadratic;
+        /*const f32 constant = 1.0f;
+        const f32 linear = lp.radius;
+        const f32 quadratic = lp.slope;
         const f32 lightMax = mmax(mmax(lp.color1.x, lp.color1.y), lp.color1.z) *
                              lp.intensity;
         const f32 radius = (-linear +  sqrtf(linear * linear - 4 * quadratic *
-                                             (constant - (256.0 / 1.0) * lightMax))) / (2 * quadratic);
+                                             (constant - (256.0 / 1.0) * lightMax))) / (2 * quadratic);*/
+        const f32 radius = lp.radius;
         const AABB aabb = {lp.pos - vec3Splat(radius), lp.pos + vec3Splat(radius)};
         const AABB clipSpaceAabb = aabbTransformSpace(aabb, mtxViewProj);
 
-        /*Transform tf;
-        tf.pos = aabb.bmin;
-        tf.scale = aabb.bmax - aabb.bmin;
-        dbgDrawRectLine(tf, vec4FromVec3(lp.color1, 1.0));*/
+        if(dbgLightBoundingBox) {
+            Transform tf;
+            tf.pos = aabb.bmin;
+            tf.scale = aabb.bmax - aabb.bmin;
+            dbgDrawRectLine(tf, vec4FromVec3(lp.color1, 1.0));
+        }
 
         const vec3 c0 = clipSpaceAabb.bmin;
         const vec3 c1 = clipSpaceAabb.bmax;
@@ -662,9 +664,8 @@ void Renderer::frame()
             bgfx::setUniform(u_lightPos, lightPos4);
             bgfx::setUniform(u_lightColor1, lp.color1);
             bgfx::setUniform(u_lightColor2, lp.color2);
-            const vec4 lightLinearQuadraticIntensity = vec4{lp.att_linear, lp.att_quadratic,
-                                                         lp.intensity, 1.0};
-            bgfx::setUniform(u_lightLinearQuadraticIntensity, lightLinearQuadraticIntensity);
+            const vec4 lightParams = {lp.intensity, lp.radius, lp.slope, lp.falloff};
+            bgfx::setUniform(u_lightParams, lightParams);
 
             bgfx::setVertexBuffer(0, &tvb);
             bgfx::setIndexBuffer(&tib);
