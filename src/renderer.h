@@ -69,7 +69,8 @@ struct ShadowMapDirectional
 struct LightPoint
 {
     vec3 pos = {};
-    vec3 color = {1, 1, 1};
+    vec3 color1 = {1, 1, 1};
+    vec3 color2 = {0, 0, 0};
     f32 intensity = 1.0f;
     f32 att_linear = 0.1f;
     f32 att_quadratic = 0.1f;
@@ -92,6 +93,7 @@ struct Renderer
             GAME,
             LIGHT,
             COMBINE,
+            POST_PROCESS,
             DBG_DRAW,
             UI,
         };
@@ -114,6 +116,7 @@ struct Renderer
     bgfx::ProgramHandle progGbuffer;
     bgfx::ProgramHandle progGbufferInst;
     bgfx::ProgramHandle progLightPass;
+    bgfx::ProgramHandle progToneMap;
 
     bgfx::UniformHandle u_color;
     bgfx::UniformHandle s_albedo;
@@ -123,11 +126,14 @@ struct Renderer
     bgfx::UniformHandle u_depthScaleOffset;
     bgfx::UniformHandle s_shadowMap;
     bgfx::UniformHandle s_lightMap;
+    bgfx::UniformHandle s_combine;
     bgfx::UniformHandle u_lightPos;
     bgfx::UniformHandle u_lightMtx;
     bgfx::UniformHandle u_lightDir;
-    bgfx::UniformHandle u_lightColor;
+    bgfx::UniformHandle u_lightColor1;
+    bgfx::UniformHandle u_lightColor2;
     bgfx::UniformHandle u_lightLinearQuadraticIntensity;
+    bgfx::UniformHandle u_exposure;
 
     bgfx::VertexBufferHandle cubeVbh;
     bgfx::VertexBufferHandle originVbh;
@@ -142,6 +148,9 @@ struct Renderer
     bgfx::TextureHandle fbTexLight;
     bgfx::FrameBufferHandle fbhLight;
 
+    bgfx::TextureHandle fbTexCombine;
+    bgfx::FrameBufferHandle fbhCombine;
+
     bool8 caps_shadowSamplerSupported;
 
     mat4 mtxProj;
@@ -153,10 +162,10 @@ struct Renderer
 
     Array<LightPoint> lightPointList;
 
-    bool dbgEnableGrid = true;
-    bool dbgEnableWorldOrigin = true;
+    bool dbgEnableGrid = false;
+    bool dbgEnableWorldOrigin = false;
     bool dbgEnableDbgPhysics = false;
-
+    f32 dbgExposure = 1.0f;
 
     bool init(i32 renderWidth_, i32 renderHeight_);
     void deinit();

@@ -215,7 +215,7 @@ bool GameData::init()
     CShipControllerHuman& playerController = ecs.addCompShipControllerHuman(playerEid);
     CPlayerShipMovement& playerMovt = ecs.addCompPlayerShipMovement(playerEid);
     CShipWeapon& playerWeapon = ecs.addCompShipWeapon(playerEid);
-    //CLightPoint& playerLight =  ecs.addCompLightPoint(playerEid);
+    CLightPoint& playerLight =  ecs.addCompLightPoint(playerEid);
 
     playerTf.pos = {10, 10, 0};
     playerTf.scale = {0.5f, 0.5f, 0.5f};
@@ -241,13 +241,15 @@ bool GameData::init()
     playerWeapon.hMeshBullet = meshBullet1;
     playerWeapon.meshColor = vec4{1, 0, 0, 1};
 
-    /*playerLight.light.intensity = 10.f;
-    playerLight.light.pos.z = 2.f;*/
+    playerLight.light.color1 = {1, 0.1f, 0.1f};
+    playerLight.light.color2 = {1, 0, 0};
+    playerLight.light.intensity = 2.f;
+    playerLight.light.pos.z = 2.f;
     // --------------------
 
 
     // create basic enemies
-    for(i32 i = 0; i < 20; ++i) {
+    for(i32 i = 0; i < 5; ++i) {
         const i32 eid = ecs.createEntity("BasicEnemy");
         CTransform& tf = ecs.addCompTransform(eid);
         CPhysBody& physBody = ecs.addCompPhysBody(eid);
@@ -332,6 +334,16 @@ void GameData::componentDoUi(const i32 eid, const u64 compBit)
         case ComponentBit::BulletMovement: {
             CBulletMovement& bm = ecs.getCompBulletMovement(eid);
             ImGui::InputFloat2("vel", bm.vel.data);
+        } break;
+
+        case ComponentBit::LightPoint: {
+            CLightPoint& comp = ecs.getCompLightPoint(eid);
+            LightPoint& lp = comp.light;
+            ImGui::ColorEdit3("color1", lp.color1.data);
+            ImGui::ColorEdit3("color2", lp.color2.data);
+            ImGui::SliderFloat("intensity", &lp.intensity, 0.001, 100.0);
+            ImGui::SliderFloat("att_linear", &lp.att_linear, 0.0001, 10.0, "%.5f");
+            ImGui::SliderFloat("att_quadratic", &lp.att_quadratic, 0.0001, 10.0, "%.5f");
         } break;
     }
 }
@@ -443,6 +455,10 @@ void GameData::update(f64 delta)
     ImGui::Image(rdr.fbTexLight, ImVec2(300, 300 * (9.0f/16.0f)));
     ImGui::SameLine();
 
+    ImGui::End();
+
+    ImGui::Begin("Renderer");
+    ImGui::SliderFloat("exposure", &rdr.dbgExposure, 0.1f, 10.0f, "%.3f");
     ImGui::End();
 }
 

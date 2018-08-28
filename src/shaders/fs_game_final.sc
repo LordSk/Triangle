@@ -5,7 +5,6 @@ $input v_texcoord0
 SAMPLER2D(s_albedo, 0);
 SAMPLER2D(s_position, 1);
 SAMPLER2D(s_normal, 2);
-SAMPLER2D(s_depth, 3);
 SAMPLER2DSHADOW(s_shadowMap, 4);
 SAMPLER2D(s_lightMap, 5);
 #define Sampler sampler2DShadow
@@ -85,7 +84,7 @@ void main()
     vec4 color4 = toLinear(texture2D(s_albedo, v_texcoord0));
     vec3 color = color4.rgb;
     vec3 position = texture2D(s_position, v_texcoord0).xyz;
-    float depth = texture2D(s_depth, v_texcoord0).r;
+    
     vec4 texNormal = texture2D(s_normal, v_texcoord0);
     vec3 normal = texNormal.xyz * 2.0 - 1.0 * texNormal.w;
     vec4 lightMap = texture2D(s_lightMap, v_texcoord0);
@@ -98,5 +97,4 @@ void main()
     float light = max(dot(normal, -normalize(u_lightDir.xyz)), 0.0);
     //gl_FragColor = vec4(toGamma(visibility * (color * lightMap.xyz) * light + color * 0.001), color4.a);
     gl_FragColor = vec4(toGamma(color * lightMap.xyz + color * 0.001), color4.a);
-    gl_FragDepth = depth;
 }

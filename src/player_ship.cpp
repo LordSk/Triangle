@@ -204,7 +204,11 @@ void updateShipWeapon(EntityComponentSystem* ecs, CShipWeapon* eltList, const i3
             bx::quatMul(meshComp.tf.rot, baseRot, rotZ);
             meshComp.tf.scale = vec3Splat(0.5);
 
-            bulletLight.light.color = vec4ToVec3(weap.meshColor);
+            vec3 color = vec4ToVec3(weap.meshColor);
+            bulletLight.light.color1 = vec3Norm(color + vec3Splat(0.2));
+            bulletLight.light.color2 = color;
+            bulletLight.light.att_linear = 0;
+            bulletLight.light.att_quadratic = 0.3;
         }
     }
 }
