@@ -108,16 +108,26 @@ struct CHealthCore
 };
 
 //@Component
-struct CLightPoint
+struct CLightPoint: LightPoint
 {
-    Transform tf;
-    LightPoint light;
+    //
 };
 
 void updateLightPoint(struct EntityComponentSystem* ecs, CLightPoint* eltList, const i32 count,
                       const i32* entityId, f64 delta, f64 physLerpAlpha);
 void onDeleteLightPoint(struct EntityComponentSystem* ecs, CLightPoint* eltList, const i32 count,
                         const i32* entityId, bool8* entDeleteFlag);
+
+//@Component
+struct CLightDirectional: LightDirectional // shadowed
+{
+    //
+};
+
+void updateLightDirectional(struct EntityComponentSystem* ecs, CLightDirectional* eltList, const i32 count,
+                            const i32* entityId, f64 delta, f64 physLerpAlpha);
+void onDeleteLightDirectional(struct EntityComponentSystem* ecs, CLightDirectional* eltList, const i32 count,
+                              const i32* entityId, bool8* entDeleteFlag);
 
 void updateHealthCore(struct EntityComponentSystem* ecs, CHealthCore* eltList, const i32 count,
                       const i32* entityId, f64 delta, f64 physLerpAlpha);

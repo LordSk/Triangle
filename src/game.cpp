@@ -241,12 +241,12 @@ bool GameData::init()
     playerWeapon.hMeshBullet = meshBullet1;
     playerWeapon.meshColor = vec4{1, 0, 0, 1};
 
-    playerLight.light.color1 = {1, 0.1f, 0.1f};
-    playerLight.light.color2 = {1, 0, 0};
-    playerLight.light.intensity = 2.f;
-    playerLight.light.radius = 20.f;
-    playerLight.light.slope = 0.5f;
-    playerLight.light.pos.z = 1.f;
+    playerLight.color1 = {1, 0.1f, 0.1f};
+    playerLight.color2 = {1, 0, 0};
+    playerLight.intensity = 2.f;
+    playerLight.radius = 20.f;
+    playerLight.slope = 0.5f;
+    playerLight.pos.z = 1.f;
     // --------------------
 
 
@@ -291,6 +291,28 @@ bool GameData::init()
         healthCore.healthMax = 50;
         healthCore.health = 50;
     }
+
+    sunLightEid = ecs.createEntity("SunLight");
+    CTransform& sunLightTf = ecs.addCompTransform(sunLightEid);
+    CLightDirectional& sunLightDirectional = ecs.addCompLightDirectional(sunLightEid);
+
+    sunLightDirectional.pos = {50, 25, 30};
+    sunLightDirectional.color = {1.0f, 0.95f, 0.92f};
+    sunLightDirectional.worldArea = {
+        {-10, -10, -10},
+        {120, 65, 30}
+    };
+
+    testDirLightEid = ecs.createEntity("TestDirLight");
+    CTransform& testDirLightTf = ecs.addCompTransform(testDirLightEid);
+    CLightDirectional& testDirLightDirectional = ecs.addCompLightDirectional(testDirLightEid);
+
+    testDirLightDirectional.pos = {0, 25, 30};
+    testDirLightDirectional.color = {0.0f, 1.0f, 0.8f};
+    testDirLightDirectional.worldArea = {
+        {-10, -10, -10},
+        {120, 65, 30}
+    };
 
     return true;
 }
@@ -340,13 +362,22 @@ void GameData::componentDoUi(const i32 eid, const u64 compBit)
 
         case ComponentBit::LightPoint: {
             CLightPoint& comp = ecs.getCompLightPoint(eid);
-            LightPoint& lp = comp.light;
+            LightPoint& lp = comp;
             ImGui::ColorEdit3("color1", lp.color1.data);
             ImGui::ColorEdit3("color2", lp.color2.data);
             ImGui::SliderFloat("intensity", &lp.intensity, 0.001, 100.0);
             ImGui::SliderFloat("radius", &lp.radius, 0.01, 200.0, "%.3f");
             ImGui::SliderFloat("slope", &lp.slope, 0.0, 1.0, "%.3f");
-            ImGui::SliderFloat("falloff", &lp.falloff, 0.01, 5.0, "%.3f");
+            ImGui::SliderFloat("falloff", &lp.falloff, 0.01, 50.0, "%.3f");
+        } break;
+
+        case ComponentBit::LightDirectional: {
+            CLightDirectional& comp = ecs.getCompLightDirectional(eid);
+            LightDirectional& lp = comp;
+            ImGui::ColorEdit3("color", lp.color.data);
+            ImGui::SliderFloat("intensity", &lp.intensity, 0.001, 100.0);
+            ImGui::InputFloat3("pos", lp.pos.data);
+            ImGui::InputFloat3("dir", lp.dir.data);
         } break;
     }
 }
@@ -413,6 +444,18 @@ void GameData::update(f64 delta)
         rdr.selectCamera(CameraID::PLAYER_VIEW);
     }
 
+    // Test directional light
+    // TODO: remove
+    static f64 time = 0;
+    time += delta;
+    CLightDirectional& cld = ecs.getCompLightDirectional(sunLightEid);
+    cld.dir = vec3Norm({cosf(time * 0.1) * 30.0f, 0.001f + sinf(time * 0.1) * 30.0f, -30});
+
+    const vec3 playerPos = ecs.getCompTransform(playerEid).pos;
+    CLightDirectional& cld2 = ecs.getCompLightDirectional(testDirLightEid);
+    cld2.dir = vec3Norm(playerPos - cld2.pos);
+    // -----------------------------
+
     ImGui::Begin("EntityComponentSystem");
 
         i32 entityCount = 0;
@@ -458,10 +501,6 @@ void GameData::update(f64 delta)
     ImGui::Image(rdr.fbTexLight, ImVec2(300, 300 * (9.0f/16.0f)));
     ImGui::SameLine();
 
-    ImGui::End();
-
-    ImGui::Begin("Renderer");
-    ImGui::SliderFloat("exposure", &rdr.dbgExposure, 0.1f, 10.0f, "%.3f");
     ImGui::End();
 }
 

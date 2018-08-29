@@ -343,7 +343,7 @@ void updateLightPoint(EntityComponentSystem* ecs, CLightPoint* eltList, const i3
         CLightPoint& comp = eltList[i];
         CTransform& tf = ecs->getCompTransform(eid);
 
-        LightPoint lp = comp.light;
+        LightPoint lp = comp;
         lp.pos += tf.pos;
         rdr.lightPointList.push(lp);
     }
@@ -351,6 +351,30 @@ void updateLightPoint(EntityComponentSystem* ecs, CLightPoint* eltList, const i3
 
 void onDeleteLightPoint(EntityComponentSystem* ecs, CLightPoint* eltList, const i32 count,
                         const i32* entityId, bool8* entDeleteFlag)
+{
+
+}
+
+void updateLightDirectional(EntityComponentSystem* ecs, CLightDirectional* eltList, const i32 count,
+                            const i32* entityId, f64 delta, f64 physLerpAlpha)
+{
+    Renderer& rdr = getRenderer();
+    rdr.lightDirectionalList.clear();
+
+    for(i32 i = 0; i < count; i++) {
+        const i32 eid = entityId[i];
+        CLightDirectional& comp = eltList[i];
+        CTransform& tf = ecs->getCompTransform(eid);
+
+        LightDirectional ld = comp;
+        ld.pos += tf.pos;
+        ld.dir = vec3Norm(comp.dir);
+        rdr.lightDirectionalList.push(ld);
+    }
+}
+
+void onDeleteLightDirectional(EntityComponentSystem* ecs, CLightDirectional* eltList, const i32 count,
+                              const i32* entityId, bool8* entDeleteFlag)
 {
 
 }

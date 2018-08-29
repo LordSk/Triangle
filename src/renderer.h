@@ -77,6 +77,15 @@ struct LightPoint
     f32 falloff = 2.f; // power (default: quadratic)
 };
 
+struct LightDirectional
+{
+    vec3 pos = {};
+    vec3 dir = {0, 0, -1};
+    vec3 color = {1, 1, 1};
+    AABB worldArea = {{-10, -10, -10}, {120, 120, 50}};
+    f32 intensity = 1.0f;
+};
+
 struct Renderer
 {
     struct ViewID
@@ -116,7 +125,8 @@ struct Renderer
     bgfx::ProgramHandle progMeshShadowedInstance;
     bgfx::ProgramHandle progGbuffer;
     bgfx::ProgramHandle progGbufferInst;
-    bgfx::ProgramHandle progLightPass;
+    bgfx::ProgramHandle progLightPoint;
+    bgfx::ProgramHandle progDirShadowMap;
     bgfx::ProgramHandle progToneMap;
 
     bgfx::UniformHandle u_color;
@@ -156,12 +166,13 @@ struct Renderer
 
     mat4 mtxProj;
     mat4 mtxView;
-    mat4 mtxLight0;
 
     Array<Camera> cameraList;
     i32 currentCamId = 0;
 
     Array<LightPoint> lightPointList;
+    Array<LightDirectional> lightDirectionalList;
+    mat4 mtxLightDirectional[SHADOW_MAP_COUNT_MAX];
 
     bool dbgEnableGrid = false;
     bool dbgEnableWorldOrigin = false;
@@ -184,6 +195,10 @@ struct Renderer
 
     void fitShadowMapToSceneBounds(ShadowMapDirectional* light);
     void setupDirectionalShadowMap(const ShadowMapDirectional& light, const i32 shadowMapId);
+
+    void lightpass();
+
+    void dbgDoMenuBar();
 };
 
 void setRendererGlobal(Renderer* renderer);

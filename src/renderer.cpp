@@ -251,8 +251,9 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
     progUiFinal = loadProgram(&g_fileReader, "vs_game_final", "fs_ui_final");
     progGbuffer = loadProgram(&g_fileReader, "vs_gbuffer", "fs_gbuffer");
     progGbufferInst = loadProgram(&g_fileReader, "vs_gbuffer_inst", "fs_gbuffer");
-    progLightPass = loadProgram(&g_fileReader, "vs_light_quad", "fs_light_quad");
+    progLightPoint = loadProgram(&g_fileReader, "vs_light_quad", "fs_light_quad");
     progToneMap = loadProgram(&g_fileReader, "vs_game_final", "fs_tonemap");
+    progDirShadowMap = loadProgram(&g_fileReader, "vs_game_final", "fs_shadowmap_quad");
 
 
     i32 i = 0;
@@ -356,6 +357,7 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
     bgfx::setUniform(u_depthScaleOffset, depthScaleOffset);
 
     lightPointList.reserve(256);
+    lightDirectionalList.reserve(SHADOW_MAP_COUNT_MAX);
 
     return true;
 }
@@ -376,6 +378,13 @@ void Renderer::deinit()
     bgfx::destroy(progUiFinal);
     bgfx::destroy(progShadow);
     bgfx::destroy(progShadowInstance);
+    bgfx::destroy(progMeshShadowed);
+    bgfx::destroy(progMeshShadowedInstance);
+    bgfx::destroy(progGbuffer);
+    bgfx::destroy(progGbufferInst);
+    bgfx::destroy(progLightPoint);
+    bgfx::destroy(progDirShadowMap);
+    bgfx::destroy(progToneMap);
 
     bgfx::destroy(u_color);
     bgfx::destroy(s_albedo);
@@ -383,8 +392,20 @@ void Renderer::deinit()
     bgfx::destroy(s_normal);
     bgfx::destroy(s_depth);
     bgfx::destroy(u_depthScaleOffset);
+    bgfx::destroy(s_shadowMap);
+    bgfx::destroy(s_lightMap);
+    bgfx::destroy(s_combine);
+    bgfx::destroy(u_lightPos);
+    bgfx::destroy(u_lightMtx);
+    bgfx::destroy(u_lightDir);
+    bgfx::destroy(u_lightColor1);
+    bgfx::destroy(u_lightColor2);
+    bgfx::destroy(u_lightParams);
+    bgfx::destroy(u_exposure);
 
     bgfx::destroy(fbhGbuffer);
+    bgfx::destroy(fbhLight);
+    bgfx::destroy(fbhCombine);
 
     for(i32 i = 0; i < SHADOW_MAP_COUNT_MAX; i++) {
          bgfx::destroy(fbhShadowMap[i]);
@@ -465,15 +486,6 @@ void Renderer::setupDirectionalShadowMap(const ShadowMapDirectional& light, cons
 
     bgfx::setViewTransform(ViewID::SHADOW_MAP0 + shadowMapId, mtxLightView, mtxLightProj);
 
-    vec4 lightPos;
-    memmove(lightPos.data, light.pos.data, sizeof(light.pos));
-    bgfx::setUniform(u_lightPos, lightPos);
-
-    vec3 dir = vec3Norm(light.dir);
-    vec4 lightDir;
-    memmove(lightDir.data, dir.data, sizeof(dir));
-    bgfx::setUniform(u_lightDir, lightDir);
-
     const float sy = caps->originBottomLeft ? 0.5f : -0.5f;
     const float sz = caps->homogeneousDepth ? 0.5f :  1.0f;
     const float tz = caps->homogeneousDepth ? 0.5f :  0.0f;
@@ -487,106 +499,11 @@ void Renderer::setupDirectionalShadowMap(const ShadowMapDirectional& light, cons
 
     mat4 mtxTmp;
     bx::mtxMul(mtxTmp,   mtxLightProj, mtxCrop);
-    bx::mtxMul(mtxLight0, mtxLightView, mtxTmp);
-
-    bgfx::setUniform(u_lightMtx, mtxLight0);
+    bx::mtxMul(mtxLightDirectional[shadowMapId], mtxLightView, mtxTmp);
 }
 
-void Renderer::frame()
+void Renderer::lightpass()
 {
-    bgfx::setViewRect(ViewID::GAME, 0, 0, u16(renderWidth), u16(renderHeight));
-    bgfx::setViewRect(ViewID::LIGHT, 0, 0, u16(renderWidth), u16(renderHeight));
-    bgfx::setViewRect(ViewID::UI, 0, 0, u16(renderWidth), u16(renderHeight));
-    bgfx::setViewRect(ViewID::COMBINE, 0, 0, u16(renderWidth), u16(renderHeight));
-    bgfx::setViewRect(ViewID::POST_PROCESS, 0, 0, u16(renderWidth), u16(renderHeight));
-    bgfx::setViewRect(ViewID::DBG_DRAW, 0, 0, u16(renderWidth), u16(renderHeight));
-
-    bgfx::setViewTransform(ViewID::GAME, mtxView, mtxProj);
-    bgfx::setViewTransform(ViewID::DBG_DRAW, mtxView, mtxProj);
-
-    // shadow map
-    static i64 t0 = bx::getHPCounter();
-    i64 now = bx::getHPCounter();
-    const f64 freq = f64(bx::getHPFrequency());
-    f32 time = f32((now - t0)/ freq) * 0.5;
-
-    Camera camLight;
-    camLight.eye = {50, 25, 30};
-    camLight.at = {50 + cosf(time) * 30.0f, 25.001f + sinf(time) * 30.0f, 0};
-    //camLight.at = {50 + 15, 25.001f, 0};
-
-    ShadowMapDirectional sunlight;
-    sunlight.pos = camLight.eye;
-    sunlight.dir = camLight.at - camLight.eye;
-    sunlight.worldArea = {
-        {-10, -10, -10},
-        {120, 65, 30}
-    };
-
-    fitShadowMapToSceneBounds(&sunlight);
-    setupDirectionalShadowMap(sunlight, 0);
-
-#if 0
-    const vec3 ld = vec3Norm(sunlight.dir);
-    dbgDrawSphere(sunlight.pos, 1, vec4Splat(1.0));
-    dbgDrawLine(sunlight.pos, sunlight.pos + ld * 5.f, vec4Splat(1.0), 0.1f);
-
-    dbgDrawOrthoFrustrum(sunlight.pos, sunlight.pos + sunlight.dir, sunlight.orthoMin.z, sunlight.orthoMax.z,
-                         sunlight.orthoMin.x, sunlight.orthoMax.x, sunlight.orthoMin.y, sunlight.orthoMax.y,
-                         vec4{1, 1, 0, 1}, 0.1f);
-
-    Transform lightWorldAreaTf;
-    lightWorldAreaTf.pos = sunlight.worldArea.bmin;
-    lightWorldAreaTf.scale = sunlight.worldArea.bmax - sunlight.worldArea.bmin;
-    dbgDrawRectLine(lightWorldAreaTf, vec4{0, 1, 0, 1});
-#endif
-
-
-    // This dummy draw call is here to make sure that view x is cleared
-    // if no other draw calls are submitted to view x.
-    bgfx::touch(ViewID::GAME);
-    bgfx::touch(ViewID::LIGHT);
-    bgfx::touch(ViewID::UI);
-    bgfx::touch(ViewID::COMBINE);
-    bgfx::touch(ViewID::POST_PROCESS);
-    bgfx::touch(ViewID::DBG_DRAW);
-
-    // origin gizmo
-    if(dbgEnableWorldOrigin) {
-        bgfx::setState(0
-            | BGFX_STATE_WRITE_MASK
-            | BGFX_STATE_DEPTH_TEST_LESS
-            | BGFX_STATE_MSAA
-            | BGFX_STATE_PT_LINES
-            );
-
-        const f32 transparent[] = {0, 0, 0, 0};
-        bgfx::setUniform(u_color, transparent);
-        bgfx::setVertexBuffer(0, originVbh, 0, BX_COUNTOF(s_originVertData));
-        bgfx::submit(ViewID::DBG_DRAW, progDbgColor);
-    }
-
-    // XY grid
-    if(dbgEnableGrid) {
-        bgfx::setState(0
-            | BGFX_STATE_WRITE_MASK
-            | BGFX_STATE_DEPTH_TEST_LESS
-            | BGFX_STATE_MSAA
-            | BGFX_STATE_PT_LINES
-            );
-
-        mat4 mtxGrid;
-        bx::mtxTranslate(mtxGrid, -500, -500, 0);
-        bgfx::setTransform(mtxGrid);
-
-        const f32 white[] = {0.6f, 0.6f, 0.6f, 1};
-        bgfx::setUniform(u_color, white);
-        bgfx::setVertexBuffer(0, gridVbh, 0, BX_COUNTOF(s_gridLinesVertData));
-        bgfx::submit(ViewID::DBG_DRAW, progDbgColor);
-    }
-
-#if 1
-    // light pass
     const i32 lightPointCount = lightPointList.count();
     const LightPoint* lightPoints = lightPointList.data();
 
@@ -674,11 +591,130 @@ void Renderer::frame()
                 | BGFX_STATE_WRITE_RGB
                 | BGFX_STATE_BLEND_ADD
                 );
-            bgfx::submit(ViewID::LIGHT, progLightPass);
+            bgfx::submit(ViewID::LIGHT, progLightPoint);
         }
     }
 
-#endif
+    const i32 lightDirectionalCount = lightDirectionalList.count();
+    const LightDirectional* lightDirectionals = lightDirectionalList.data();
+    assert(lightDirectionalCount <= SHADOW_MAP_COUNT_MAX); // TODO: decouple from shadow maps
+
+    for(i32 i = 0; i < lightDirectionalCount; i++) {
+        const LightDirectional& ld = lightDirectionals[i];
+        ShadowMapDirectional smd;
+        smd.pos = ld.pos;
+        smd.dir = ld.dir;
+        smd.worldArea = ld.worldArea;
+
+        fitShadowMapToSceneBounds(&smd);
+        setupDirectionalShadowMap(smd, i);
+
+        if(dbgLightBoundingBox) {
+            const vec3 dir = vec3Norm(smd.dir);
+            const vec4 lightColor = vec4FromVec3(ld.color, 1.0);
+            dbgDrawSphere(smd.pos, 1, lightColor);
+            dbgDrawLine(smd.pos, smd.pos + dir * 5.f, lightColor, 0.1f);
+
+            dbgDrawOrthoFrustrum(smd.pos, smd.pos + smd.dir, smd.orthoMin.z,
+                                 smd.orthoMax.z,
+                                 smd.orthoMin.x, smd.orthoMax.x, smd.orthoMin.y,
+                                 smd.orthoMax.y,
+                                 vec4FromVec3(ld.color, 1.0), 0.1f);
+
+            Transform lightWorldAreaTf;
+            lightWorldAreaTf.pos = smd.worldArea.bmin;
+            lightWorldAreaTf.scale = smd.worldArea.bmax - smd.worldArea.bmin;
+            dbgDrawRectLine(lightWorldAreaTf, lightColor);
+        }
+    }
+
+    for(i32 i = 0; i < lightDirectionalCount; i++) {
+        const LightDirectional& ld = lightDirectionals[i];
+
+        // TODO: clip this based on shadow map area
+        bgfx::setState(0
+            | BGFX_STATE_WRITE_RGB
+            | BGFX_STATE_BLEND_ADD
+        );
+
+        bgfx::setVertexBuffer(0, vbhScreenQuad, 0, 6);
+
+        bgfx::setUniform(u_lightMtx, mtxLightDirectional[i]);
+        bgfx::setUniform(u_lightDir, ld.dir);
+        bgfx::setUniform(u_lightPos, ld.pos);
+        bgfx::setUniform(u_lightColor1, ld.color);
+        vec4 lightParams = {ld.intensity, 0.0f, 0.0f, 0.0f};
+        bgfx::setUniform(u_lightParams, lightParams);
+
+        bgfx::setTexture(1, s_position, bgfx::getTexture(fbhGbuffer, 1));
+        bgfx::setTexture(2, s_normal, bgfx::getTexture(fbhGbuffer, 2));
+        bgfx::setTexture(4, s_shadowMap, texShadowMap[i]);
+        bgfx::submit(ViewID::LIGHT, progDirShadowMap);
+    }
+}
+
+void Renderer::dbgDoMenuBar()
+{
+    ImGui::SliderFloat("exposure", &dbgExposure, 0.1f, 10.0f, "%.3f");
+}
+
+void Renderer::frame()
+{
+    bgfx::setViewRect(ViewID::GAME, 0, 0, u16(renderWidth), u16(renderHeight));
+    bgfx::setViewRect(ViewID::LIGHT, 0, 0, u16(renderWidth), u16(renderHeight));
+    bgfx::setViewRect(ViewID::UI, 0, 0, u16(renderWidth), u16(renderHeight));
+    bgfx::setViewRect(ViewID::COMBINE, 0, 0, u16(renderWidth), u16(renderHeight));
+    bgfx::setViewRect(ViewID::POST_PROCESS, 0, 0, u16(renderWidth), u16(renderHeight));
+    bgfx::setViewRect(ViewID::DBG_DRAW, 0, 0, u16(renderWidth), u16(renderHeight));
+
+    bgfx::setViewTransform(ViewID::GAME, mtxView, mtxProj);
+    bgfx::setViewTransform(ViewID::DBG_DRAW, mtxView, mtxProj);
+
+    // This dummy draw call is here to make sure that view x is cleared
+    // if no other draw calls are submitted to view x.
+    bgfx::touch(ViewID::GAME);
+    bgfx::touch(ViewID::LIGHT);
+    bgfx::touch(ViewID::UI);
+    bgfx::touch(ViewID::COMBINE);
+    bgfx::touch(ViewID::POST_PROCESS);
+    bgfx::touch(ViewID::DBG_DRAW);
+
+    // origin gizmo
+    if(dbgEnableWorldOrigin) {
+        bgfx::setState(0
+            | BGFX_STATE_WRITE_MASK
+            | BGFX_STATE_DEPTH_TEST_LESS
+            | BGFX_STATE_MSAA
+            | BGFX_STATE_PT_LINES
+            );
+
+        const f32 transparent[] = {0, 0, 0, 0};
+        bgfx::setUniform(u_color, transparent);
+        bgfx::setVertexBuffer(0, originVbh, 0, BX_COUNTOF(s_originVertData));
+        bgfx::submit(ViewID::DBG_DRAW, progDbgColor);
+    }
+
+    // XY grid
+    if(dbgEnableGrid) {
+        bgfx::setState(0
+            | BGFX_STATE_WRITE_MASK
+            | BGFX_STATE_DEPTH_TEST_LESS
+            | BGFX_STATE_MSAA
+            | BGFX_STATE_PT_LINES
+            );
+
+        mat4 mtxGrid;
+        bx::mtxTranslate(mtxGrid, -500, -500, 0);
+        bgfx::setTransform(mtxGrid);
+
+        const f32 white[] = {0.6f, 0.6f, 0.6f, 1};
+        bgfx::setUniform(u_color, white);
+        bgfx::setVertexBuffer(0, gridVbh, 0, BX_COUNTOF(s_gridLinesVertData));
+        bgfx::submit(ViewID::DBG_DRAW, progDbgColor);
+    }
+
+    // light pass
+    lightpass();
 
     bgfx::setState(0
         | BGFX_STATE_WRITE_RGB
@@ -688,11 +724,7 @@ void Renderer::frame()
 
     bgfx::setVertexBuffer(0, vbhScreenQuad, 0, 6);
 
-    bgfx::setUniform(u_lightMtx, mtxLight0);
     bgfx::setTexture(0, s_albedo, bgfx::getTexture(fbhGbuffer, 0));
-    bgfx::setTexture(1, s_position, bgfx::getTexture(fbhGbuffer, 1));
-    bgfx::setTexture(2, s_normal, bgfx::getTexture(fbhGbuffer, 2));
-    bgfx::setTexture(4, s_shadowMap, texShadowMap[0]);
     bgfx::setTexture(5, s_lightMap, fbTexLight);
     bgfx::submit(ViewID::COMBINE, progGameFinal);
 
@@ -731,8 +763,19 @@ void Renderer::drawMesh(MeshHandle hmesh, const mat4& mtxModel, const vec4& colo
         | BGFX_STATE_CULL_CCW
         /*| BGFX_STATE_MSAA*/;
 
-    meshSubmit(hmesh, ViewID::SHADOW_MAP0, progShadow,
-               mtxModel, state);
+    // draw on shadow maps
+    // TODO: cull outside of light worldArea bounds
+    const i32 lightDirectionalCount = lightDirectionalList.count();
+    const LightDirectional* lightDirectionals = lightDirectionalList.data();
+
+    for(i32 i = 0; i < lightDirectionalCount; i++) {
+        const LightDirectional& ld = lightDirectionals[i];
+        bgfx::setUniform(u_lightPos, ld.pos);
+        bgfx::setUniform(u_lightDir, ld.dir);
+        bgfx::setUniform(u_lightMtx, mtxLightDirectional[i]);
+        meshSubmit(hmesh, ViewID::SHADOW_MAP0 + i, progShadow,
+                   mtxModel, state);
+    }
 }
 
 void Renderer::drawCubeInstances(const InstanceData* instData, const i32 cubeCount, const bool8 dropShadow)
@@ -760,17 +803,30 @@ void Renderer::drawCubeInstances(const InstanceData* instData, const i32 cubeCou
         bgfx::submit(ViewID::GAME, progGbufferInst);
 
         if(dropShadow) {
-            bgfx::setVertexBuffer(0, cubeVbh, 0, 36);
-            bgfx::setInstanceDataBuffer(&idb);
+            // draw on shadow maps
+            // TODO: cull outside of light worldArea bounds
+            const i32 lightDirectionalCount = lightDirectionalList.count();
+            const LightDirectional* lightDirectionals = lightDirectionalList.data();
 
-            bgfx::setState(0
-               | (caps_shadowSamplerSupported ? 0 : BGFX_STATE_WRITE_RGB|BGFX_STATE_WRITE_A)
-               | BGFX_STATE_WRITE_Z
-               | BGFX_STATE_DEPTH_TEST_LESS
-               | BGFX_STATE_CULL_CW
-               /*| BGFX_STATE_MSAA*/);
+            for(i32 i = 0; i < lightDirectionalCount; i++) {
+                const LightDirectional& ld = lightDirectionals[i];
+                bgfx::setUniform(u_lightPos, ld.pos);
+                bgfx::setUniform(u_lightDir, ld.dir);
+                bgfx::setUniform(u_lightMtx, mtxLightDirectional[i]);
 
-            bgfx::submit(ViewID::SHADOW_MAP0, progShadowInstance);
+
+                bgfx::setVertexBuffer(0, cubeVbh, 0, 36);
+                bgfx::setInstanceDataBuffer(&idb);
+
+                bgfx::setState(0
+                   | (caps_shadowSamplerSupported ? 0 : BGFX_STATE_WRITE_RGB|BGFX_STATE_WRITE_A)
+                   | BGFX_STATE_WRITE_Z
+                   | BGFX_STATE_DEPTH_TEST_LESS
+                   | BGFX_STATE_CULL_CW
+                   /*| BGFX_STATE_MSAA*/);
+
+                bgfx::submit(ViewID::SHADOW_MAP0 + i, progShadowInstance);
+            }
         }
     }
 }
@@ -790,18 +846,29 @@ void Renderer::drawCube(mat4 mtxModel, vec4 color)
 
     bgfx::submit(ViewID::GAME, progGbuffer);
 
-    bgfx::setTransform(mtxModel);
-    bgfx::setUniform(u_color, color);
 
-    bgfx::setVertexBuffer(0, cubeVbh, 0, 36);
-    bgfx::setState(0
-       | (caps_shadowSamplerSupported ? 0 : BGFX_STATE_WRITE_RGB|BGFX_STATE_WRITE_A)
-       | BGFX_STATE_WRITE_Z
-       | BGFX_STATE_DEPTH_TEST_LESS
-       | BGFX_STATE_CULL_CCW
-       | BGFX_STATE_MSAA);
+    // draw on shadow maps
+    // TODO: cull outside of light worldArea bounds
+    const i32 lightDirectionalCount = lightDirectionalList.count();
+    const LightDirectional* lightDirectionals = lightDirectionalList.data();
 
-    bgfx::submit(ViewID::SHADOW_MAP0, progShadow);
+    for(i32 i = 0; i < lightDirectionalCount; i++) {
+        const LightDirectional& ld = lightDirectionals[i];
+        bgfx::setUniform(u_lightPos, ld.pos);
+        bgfx::setUniform(u_lightDir, ld.dir);
+        bgfx::setUniform(u_lightMtx, mtxLightDirectional[i]);
+        bgfx::setTransform(mtxModel);
+
+        bgfx::setVertexBuffer(0, cubeVbh, 0, 36);
+        bgfx::setState(0
+           | (caps_shadowSamplerSupported ? 0 : BGFX_STATE_WRITE_RGB|BGFX_STATE_WRITE_A)
+           | BGFX_STATE_WRITE_Z
+           | BGFX_STATE_DEPTH_TEST_LESS
+           | BGFX_STATE_CULL_CCW
+           | BGFX_STATE_MSAA);
+
+        bgfx::submit(ViewID::SHADOW_MAP0 + i, progShadow);
+    }
 }
 
 void Renderer::setCamera(const i32 camId, Camera cam)

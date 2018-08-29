@@ -103,6 +103,9 @@ struct GameData
     i32 playerEid = -1;
     i32 weapBulletCount = 0;
 
+    i32 sunLightEid = -1;
+    i32 testDirLightEid = -1;
+
     bool init();
     void deinit();
 

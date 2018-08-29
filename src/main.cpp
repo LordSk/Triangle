@@ -234,20 +234,29 @@ void updateUI(f64 delta)
 
     Renderer& rdr = getRenderer();
 
-    im::Begin("Debug");
+    if(ImGui::BeginMainMenuBar()) {
+        if(im::BeginMenu("View")) {
+            const char* comboCameras[] = { "Free flight", "Follow player" };
+            im::Combo("Camera", &game.cameraId, comboCameras, arr_count(comboCameras));
+            im::InputFloat("Player camera height", &game.dbgPlayerCamHeight, 1.0f, 10.0f);
 
-    const char* comboCameras[] = { "Free flight", "Follow player" };
-    im::Combo("Camera", &game.cameraId, comboCameras, arr_count(comboCameras));
-    im::InputFloat("Player camera height", &game.dbgPlayerCamHeight, 1.0f, 10.0f);
-    im::Checkbox("Enable grid", &renderer.dbgEnableGrid);
-    im::Checkbox("Enable world origin", &renderer.dbgEnableWorldOrigin);
-    im::Checkbox("Enable debug physics", &renderer.dbgEnableDbgPhysics);
-    im::Checkbox("Enable debug damage zones", &game.dbgEnableDmgZones);
-    im::Checkbox("Enable light bound boxes", &rdr.dbgLightBoundingBox);
+            im::Checkbox("Enable grid", &renderer.dbgEnableGrid);
+            im::Checkbox("Enable world origin", &renderer.dbgEnableWorldOrigin);
+            im::Checkbox("Enable debug physics", &renderer.dbgEnableDbgPhysics);
+            im::Checkbox("Enable debug damage zones", &game.dbgEnableDmgZones);
+            im::Checkbox("Enable light bound boxes", &rdr.dbgLightBoundingBox);
+            im::EndMenu();
+        }
+        if(im::BeginMenu("Renderer")) {
+            rdr.dbgDoMenuBar();
+            im::EndMenu();
+        }
 
-    im::End();
+        im::EndMainMenuBar();
+    }
 
-    im::Begin("Stats");
+    im::Begin("Stats", nullptr, ImGuiWindowFlags_AlwaysAutoResize|
+              ImGuiWindowFlags_NoTitleBar);
     const bgfx::Stats* stats = bgfx::getStats();
     const f64 toMsCpu = 1000.0/stats->cpuTimerFreq;
     const f64 toMsGpu = 1000.0/stats->gpuTimerFreq;
