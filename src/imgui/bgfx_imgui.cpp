@@ -336,10 +336,10 @@ struct OcornutImguiContext
         m_viewId = _viewId;
 
         ImGuiIO& io = ImGui::GetIO();
-        if (_inputChar < 0x7f)
+        /*if (_inputChar < 0x7f)
         {
             io.AddInputCharacter(_inputChar); // ASCII or GTFO! :(
-        }
+        }*/
 
         io.DisplaySize = ImVec2( (float)_width, (float)_height);
 

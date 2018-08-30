@@ -75,6 +75,12 @@ for lid, l in enumerate(lines):
             str += "    ADD_FUNC(%s)\n" % (c[1:])
         lines[lid] = str
         
+    elif l == "%%HAS_COMPONENT%%\n":
+        str = ""
+        for cid, c in enumerate(compNames):
+            str += "    HAS_FUNC(%s)\n" % (c[1:])
+        lines[lid] = str
+        
     elif l == "%%GETTER_COMPONENT%%\n":
         str = ""
         for cid, c in enumerate(compNames):

@@ -293,25 +293,25 @@ bool GameData::init()
     }
 
     sunLightEid = ecs.createEntity("SunLight");
-    CTransform& sunLightTf = ecs.addCompTransform(sunLightEid);
     CLightDirectional& sunLightDirectional = ecs.addCompLightDirectional(sunLightEid);
 
+    sunLightDirectional.intensity = 0.5f;
     sunLightDirectional.pos = {50, 25, 30};
     sunLightDirectional.color = {1.0f, 0.95f, 0.92f};
     sunLightDirectional.worldArea = {
         {-10, -10, -10},
-        {120, 65, 30}
+        {110, 60, 15}
     };
 
     testDirLightEid = ecs.createEntity("TestDirLight");
-    CTransform& testDirLightTf = ecs.addCompTransform(testDirLightEid);
     CLightDirectional& testDirLightDirectional = ecs.addCompLightDirectional(testDirLightEid);
 
+    testDirLightDirectional.intensity = 0.5f;
     testDirLightDirectional.pos = {0, 25, 30};
     testDirLightDirectional.color = {0.0f, 1.0f, 0.8f};
     testDirLightDirectional.worldArea = {
         {-10, -10, -10},
-        {120, 65, 30}
+        {110, 60, 15}
     };
 
     return true;
@@ -378,6 +378,9 @@ void GameData::componentDoUi(const i32 eid, const u64 compBit)
             ImGui::SliderFloat("intensity", &lp.intensity, 0.001, 100.0);
             ImGui::InputFloat3("pos", lp.pos.data);
             ImGui::InputFloat3("dir", lp.dir.data);
+            ImGui::Separator();
+            ImGui::InputFloat3("area min", lp.worldArea.bmin.data);
+            ImGui::InputFloat3("area max", lp.worldArea.bmax.data);
         } break;
     }
 }
@@ -451,9 +454,8 @@ void GameData::update(f64 delta)
     CLightDirectional& cld = ecs.getCompLightDirectional(sunLightEid);
     cld.dir = vec3Norm({cosf(time * 0.1) * 30.0f, 0.001f + sinf(time * 0.1) * 30.0f, -30});
 
-    const vec3 playerPos = ecs.getCompTransform(playerEid).pos;
     CLightDirectional& cld2 = ecs.getCompLightDirectional(testDirLightEid);
-    cld2.dir = vec3Norm(playerPos - cld2.pos);
+    cld2.dir = vec3Norm({cosf(-time * 0.2), 0.001f + sinf(time * 0.2) * 1.2f, -3});
     // -----------------------------
 
     ImGui::Begin("EntityComponentSystem");
@@ -466,13 +468,32 @@ void GameData::update(f64 delta)
         ImGui::Text("Entity count (%d/%d):", entityCount, MAX_ENTITIES);
         ImGui::ProgressBar((f32)entityCount/MAX_ENTITIES);
 
+        static char searchEntityInput[64] = "";
+        ImGui::InputText("##search_entity", searchEntityInput, sizeof(searchEntityInput));
+        ImGui::SameLine();
+        if(ImGui::Button("Clear")) {
+            memset(searchEntityInput, 0, sizeof(searchEntityInput));
+        }
+        const i32 searchLen = strlen(searchEntityInput);
+
         ImGui::BeginChild("entity_list", ImVec2(-1, 0));
         for(i32 i = 0; i < MAX_ENTITIES; i++) {
             const u64 compBits = ecs.entityCompBits[i];
 
+            char entityStr[64];
+            sprintf(entityStr, "%s %d", ecs.entityName[i], i);
+            char nameLower[64] = {0};
+            char searchLower[64] = {0};
+
+            if(searchLen) {
+                strToLower(entityStr, strlen(entityStr), nameLower);
+                strToLower(searchEntityInput, strlen(searchEntityInput), searchLower);
+                if(!strstr(nameLower, searchLower)) {
+                    continue;
+                }
+            }
+
             if(compBits != 0) {
-                char entityStr[64];
-                sprintf(entityStr, "%s %d", ecs.entityName[i], i);
                 if(ImGui::TreeNode(entityStr)) {
                     for(i32 c = 0; c < 64; c++) {
                         if(compBits & (u64(1) << c)) {

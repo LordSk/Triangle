@@ -237,3 +237,14 @@ f64 rand1h();
 f64 randRange(f64 min, f64 max);
 void randSetSeed(u32 seed);
 
+inline void strToLower(const char* src, const i32 len, char* dest)
+{
+    for(i32 i = 0; i < len; i++) {
+        u8 c = src[i];
+        if(c >= 0x41 && c <= 0x5A) {
+            c += 32;
+        }
+        dest[i] = c;
+    }
+}
+

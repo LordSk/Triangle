@@ -341,10 +341,12 @@ void updateLightPoint(EntityComponentSystem* ecs, CLightPoint* eltList, const i3
     for(i32 i = 0; i < count; i++) {
         const i32 eid = entityId[i];
         CLightPoint& comp = eltList[i];
-        CTransform& tf = ecs->getCompTransform(eid);
 
         LightPoint lp = comp;
-        lp.pos += tf.pos;
+        if(ecs->hasCompTransform(eid)) {
+            CTransform& tf = ecs->getCompTransform(eid);
+            lp.pos += tf.pos;
+        }
         rdr.lightPointList.push(lp);
     }
 }
@@ -364,10 +366,12 @@ void updateLightDirectional(EntityComponentSystem* ecs, CLightDirectional* eltLi
     for(i32 i = 0; i < count; i++) {
         const i32 eid = entityId[i];
         CLightDirectional& comp = eltList[i];
-        CTransform& tf = ecs->getCompTransform(eid);
 
         LightDirectional ld = comp;
-        ld.pos += tf.pos;
+        if(ecs->hasCompTransform(eid)) {
+            CTransform& tf = ecs->getCompTransform(eid);
+            ld.pos += tf.pos;
+        }
         ld.dir = vec3Norm(comp.dir);
         rdr.lightDirectionalList.push(ld);
     }

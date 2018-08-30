@@ -39,6 +39,16 @@ struct EntityComponentSystem
 
 #undef ADD_FUNC
 
+#define HAS_FUNC(COMP)\
+    inline bool hasComp##COMP(const i32 eid) {\
+        assert(eid >= 0 && eid < MAX_ENTITIES);\
+        return (entityCompBits[eid] & ComponentBit::COMP) != 0;\
+    }
+
+%%HAS_COMPONENT%%
+
+#undef HAS_FUNC
+
 #define GETTER_FUNC(COMP)\
 inline C##COMP& getComp##COMP(const i32 eid) {\
     assert(eid >= 0 && eid < MAX_ENTITIES);\

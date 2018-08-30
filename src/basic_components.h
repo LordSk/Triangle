@@ -108,7 +108,7 @@ struct CHealthCore
 };
 
 //@Component
-struct CLightPoint: LightPoint
+struct CLightPoint : LightPoint
 {
     //
 };
@@ -119,7 +119,7 @@ void onDeleteLightPoint(struct EntityComponentSystem* ecs, CLightPoint* eltList,
                         const i32* entityId, bool8* entDeleteFlag);
 
 //@Component
-struct CLightDirectional: LightDirectional // shadowed
+struct CLightDirectional : LightDirectional // shadowed
 {
     //
 };
