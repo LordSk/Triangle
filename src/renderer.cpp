@@ -5,11 +5,14 @@
 #include <bx/timer.h>
 #include <imgui/imgui.h>
 
+// TODO: emit materials (non-lit)
+// TODO: glow
+
 // TODO: do not use this
 static bx::FileReader g_fileReader;
 static bx::FileWriter g_fileWriter;
 
-bgfx::VertexDecl PosColorVertex::ms_decl;
+bgfx::VertexDecl PosColorNormalVertex::ms_decl;
 bgfx::VertexDecl PosUvVertex::decl;
 
 static const PosUvVertex s_wholeScreenQuadVertData[6] = {
@@ -22,7 +25,7 @@ static const PosUvVertex s_wholeScreenQuadVertData[6] = {
     { -1.0f,  1.0f, 0, 0, 0 },
 };
 
-static PosColorVertex s_originVertData[] =
+static PosColorNormalVertex s_originVertData[] =
 {
     {0, 0, 0, 0xffff0000 },
     {10, 0, 0, 0xffff0000 },
@@ -34,7 +37,7 @@ static PosColorVertex s_originVertData[] =
     {0, 0, 10, 0xff0000ff },
 };
 
-static PosColorVertex s_cubeRainbowVertData[] =
+static PosColorNormalVertex s_cubeRainbowVertData[] =
 {
     // left
     {-0.5f, -0.5f, -0.5f, 0xffffff00, -1.0f, 0.0f, 0.0f },
@@ -90,7 +93,7 @@ static PosColorVertex s_cubeRainbowVertData[] =
     {-0.5f,  0.5f, -0.5f, 0xffff00ff, 0.0f, 1.0f, 0.0f },
 };
 
-static PosColorVertex s_gridLinesVertData[400];
+static PosColorNormalVertex s_gridLinesVertData[400];
 
 static Renderer* g_rdr;
 
@@ -131,6 +134,8 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
         LOG("ERROR> caps.limits.maxFBAttachments < 3");
         return false;
     }
+    LOG("Renderer> caps.limits.maxFBAttachments = %d", caps.limits.maxFBAttachments);
+
 
     const u32 samplerFlags = 0
                     | BGFX_TEXTURE_RT
@@ -143,23 +148,38 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
 
     // TODO: fix depth buffer multisampling
     // https://github.com/bkaradzic/bgfx/issues/1353
-    bgfx::TextureHandle fbTexGame[4];
+
+    // G buffer textures
+
     // albedo
-    fbTexGame[0] = bgfx::createTexture2D(u16(renderWidth), u16(renderHeight), false,
+    texGbuff_albedo = bgfx::createTexture2D(u16(renderWidth), u16(renderHeight), false,
+                                         1, bgfx::TextureFormat::BGRA8,
+                                         samplerFlags);
+    // emit
+    texGbuff_emit = bgfx::createTexture2D(u16(renderWidth), u16(renderHeight), false,
                                          1, bgfx::TextureFormat::BGRA8,
                                          samplerFlags);
     // position
-    fbTexGame[1] = bgfx::createTexture2D(u16(renderWidth), u16(renderHeight), false,
+    texGbuff_position = bgfx::createTexture2D(u16(renderWidth), u16(renderHeight), false,
                                          1, bgfx::TextureFormat::RGBA32F,
                                          samplerFlags);
     // normal
-    fbTexGame[2] = bgfx::createTexture2D(u16(renderWidth), u16(renderHeight), false,
+    texGbuff_normal = bgfx::createTexture2D(u16(renderWidth), u16(renderHeight), false,
                                          1, bgfx::TextureFormat::BGRA8,
                                          samplerFlags);
     // depth
-    fbTexGame[3] = bgfx::createTexture2D(u16(renderWidth), u16(renderHeight), false,
+    texGbuff_depth = bgfx::createTexture2D(u16(renderWidth), u16(renderHeight), false,
                                          1, bgfx::TextureFormat::D24,
                                          samplerFlags);
+
+    bgfx::TextureHandle fbTexGame[5] = {
+        texGbuff_albedo,
+        texGbuff_emit,
+        texGbuff_position,
+        texGbuff_normal,
+        texGbuff_depth,
+    };
+
     fbhGbuffer = bgfx::createFrameBuffer(arr_count(fbTexGame), fbTexGame, true);
 
     // light frame buffer
@@ -215,19 +235,19 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
     bgfx::setViewName(ViewID::DBG_DRAW, "Debug draw");
 
     // Create vertex stream declaration.
-    PosColorVertex::init();
+    PosColorNormalVertex::init();
     PosUvVertex::init();
 
     // Create static vertex buffer.
     cubeVbh = bgfx::createVertexBuffer(
             // Static data can be passed with bgfx::makeRef
             bgfx::makeRef(s_cubeRainbowVertData, sizeof(s_cubeRainbowVertData)),
-            PosColorVertex::ms_decl
+            PosColorNormalVertex::ms_decl
             );
     originVbh = bgfx::createVertexBuffer(
             // Static data can be passed with bgfx::makeRef
             bgfx::makeRef(s_originVertData, sizeof(s_originVertData)),
-            PosColorVertex::ms_decl
+            PosColorNormalVertex::ms_decl
             );
 
     vbhScreenQuad = bgfx::createVertexBuffer(
@@ -240,6 +260,18 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
     s_position = bgfx::createUniform("s_position", bgfx::UniformType::Int1); // sampler2D
     s_normal = bgfx::createUniform("s_normal", bgfx::UniformType::Int1); // sampler2D
     s_depth = bgfx::createUniform("s_depth", bgfx::UniformType::Int1); // sampler2D
+    u_depthScaleOffset = bgfx::createUniform("u_depthScaleOffset",  bgfx::UniformType::Vec4);
+    s_shadowMap = bgfx::createUniform("s_shadowMap",  bgfx::UniformType::Int1);
+    s_lightMap = bgfx::createUniform("s_lightMap",  bgfx::UniformType::Int1);
+    s_combine = bgfx::createUniform("s_combine",  bgfx::UniformType::Int1);
+    s_emit = bgfx::createUniform("s_emit",  bgfx::UniformType::Int1);
+    u_lightPos = bgfx::createUniform("u_lightPos",  bgfx::UniformType::Vec4);
+    u_lightMtx = bgfx::createUniform("u_lightMtx",  bgfx::UniformType::Mat4);
+    u_lightDir = bgfx::createUniform("u_lightDir",  bgfx::UniformType::Vec4);
+    u_lightColor1 = bgfx::createUniform("u_lightColor1",  bgfx::UniformType::Vec4);
+    u_lightColor2 = bgfx::createUniform("u_lightColor2",  bgfx::UniformType::Vec4);
+    u_lightParams = bgfx::createUniform("u_lightParams", bgfx::UniformType::Vec4);
+    u_exposure = bgfx::createUniform("u_exposure",  bgfx::UniformType::Vec4);
 
     progTest = loadProgram(&g_fileReader, "vs_test", "fs_test");
     progVertShading = loadProgram(&g_fileReader, "vs_vertex_shading", "fs_vertex_shading");
@@ -269,7 +301,7 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
     gridVbh = bgfx::createVertexBuffer(
             // Static data can be passed with bgfx::makeRef
             bgfx::makeRef(s_gridLinesVertData, sizeof(s_gridLinesVertData)),
-            PosColorVertex::ms_decl
+            PosColorNormalVertex::ms_decl
             );
 
     caps_shadowSamplerSupported = (caps.supported & BGFX_CAPS_TEXTURE_COMPARE_LEQUAL) != 0;
@@ -329,18 +361,6 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
         fbhShadowMap = bgfx::createFrameBuffer(BX_COUNTOF(fbtextures), fbtextures, true);*/
     }
 
-    u_depthScaleOffset = bgfx::createUniform("u_depthScaleOffset",  bgfx::UniformType::Vec4);
-    s_shadowMap = bgfx::createUniform("s_shadowMap",  bgfx::UniformType::Int1);
-    s_lightMap = bgfx::createUniform("s_lightMap",  bgfx::UniformType::Int1);
-    s_combine = bgfx::createUniform("s_combine",  bgfx::UniformType::Int1);
-    u_lightPos = bgfx::createUniform("u_lightPos",  bgfx::UniformType::Vec4);
-    u_lightMtx = bgfx::createUniform("u_lightMtx",  bgfx::UniformType::Mat4);
-    u_lightDir = bgfx::createUniform("u_lightDir",  bgfx::UniformType::Vec4);
-    u_lightColor1 = bgfx::createUniform("u_lightColor1",  bgfx::UniformType::Vec4);
-    u_lightColor2 = bgfx::createUniform("u_lightColor2",  bgfx::UniformType::Vec4);
-    u_lightParams = bgfx::createUniform("u_lightParams", bgfx::UniformType::Vec4);
-    u_exposure = bgfx::createUniform("u_exposure",  bgfx::UniformType::Vec4);
-
     if(!bgfx::isValid(s_shadowMap) ||
        !bgfx::isValid(u_lightPos) ||
        !bgfx::isValid(u_lightMtx) ||
@@ -358,6 +378,25 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
 
     lightPointList.reserve(256);
     lightDirectionalList.reserve(SHADOW_MAP_COUNT_MAX);
+
+    u8* emitImgData = loadImageRGBA8("../assets/emit_test.png");
+    if(!emitImgData) {
+        return false;
+    }
+
+    const bgfx::Memory* mem = bgfx::makeRef(emitImgData, 1024*1024*4);
+
+    texEmit = bgfx::createTexture2D(1024, 1024,
+                                    false,
+                                    1, bgfx::TextureFormat::RGBA8,
+                                    0
+                                    | BGFX_TEXTURE_MIN_POINT
+                                    | BGFX_TEXTURE_MAG_POINT
+                                    | BGFX_TEXTURE_MIP_POINT
+                                    | BGFX_TEXTURE_U_CLAMP
+                                    | BGFX_TEXTURE_V_CLAMP,
+                                    mem);
+    //freeImage(emitImgData);
 
     return true;
 }
@@ -391,6 +430,7 @@ void Renderer::deinit()
     bgfx::destroy(s_position);
     bgfx::destroy(s_normal);
     bgfx::destroy(s_depth);
+    bgfx::destroy(s_emit);
     bgfx::destroy(u_depthScaleOffset);
     bgfx::destroy(s_shadowMap);
     bgfx::destroy(s_lightMap);
@@ -575,8 +615,8 @@ void Renderer::lightpass()
             *indices++ = 3;
             *indices++ = 2;
 
-            bgfx::setTexture(1, s_position, bgfx::getTexture(fbhGbuffer, 1));
-            bgfx::setTexture(2, s_normal, bgfx::getTexture(fbhGbuffer, 2));
+            bgfx::setTexture(1, s_position, texGbuff_position);
+            bgfx::setTexture(2, s_normal, texGbuff_normal);
             const vec4 lightPos4 = vec4FromVec3(lp.pos, 1.0);
             bgfx::setUniform(u_lightPos, lightPos4);
             bgfx::setUniform(u_lightColor1, lp.color1);
@@ -646,8 +686,8 @@ void Renderer::lightpass()
         vec4 lightParams = {ld.intensity, 0.0f, 0.0f, 0.0f};
         bgfx::setUniform(u_lightParams, lightParams);
 
-        bgfx::setTexture(1, s_position, bgfx::getTexture(fbhGbuffer, 1));
-        bgfx::setTexture(2, s_normal, bgfx::getTexture(fbhGbuffer, 2));
+        bgfx::setTexture(1, s_position, texGbuff_position);
+        bgfx::setTexture(2, s_normal, texGbuff_normal);
         bgfx::setTexture(4, s_shadowMap, texShadowMap[i]);
         bgfx::submit(ViewID::LIGHT, progDirShadowMap);
     }
@@ -724,13 +764,13 @@ void Renderer::frame()
 
     bgfx::setVertexBuffer(0, vbhScreenQuad, 0, 6);
 
-    bgfx::setTexture(0, s_albedo, bgfx::getTexture(fbhGbuffer, 0));
+    bgfx::setTexture(0, s_albedo, texGbuff_albedo);
     bgfx::setTexture(5, s_lightMap, fbTexLight);
     bgfx::submit(ViewID::COMBINE, progGameFinal);
 
     // tone mapping
     bgfx::setTexture(0, s_combine, fbTexCombine);
-    bgfx::setTexture(1, s_depth, bgfx::getTexture(fbhGbuffer, 3));
+    bgfx::setTexture(1, s_depth, texGbuff_depth);
     bgfx::setState(0
         | BGFX_STATE_WRITE_RGB
         | BGFX_STATE_WRITE_Z
@@ -752,6 +792,7 @@ void Renderer::frame()
 void Renderer::drawMesh(MeshHandle hmesh, const mat4& mtxModel, const vec4& color)
 {
     bgfx::setUniform(u_color, color);
+    bgfx::setTexture(0, s_emit, texEmit);
 
     meshSubmit(hmesh, ViewID::GAME, progGbuffer,
                mtxModel, BGFX_STATE_MASK);
@@ -790,6 +831,7 @@ void Renderer::drawCubeInstances(const InstanceData* instData, const i32 cubeCou
 
         memmove(idb.data, instData, instanceStride * cubeCount);
 
+        bgfx::setTexture(0, s_emit, texEmit);
         bgfx::setVertexBuffer(0, cubeVbh, 0, 36);
         bgfx::setInstanceDataBuffer(&idb);
 
@@ -835,6 +877,7 @@ void Renderer::drawCube(mat4 mtxModel, vec4 color)
 {
     bgfx::setTransform(mtxModel);
     bgfx::setUniform(u_color, color);
+    bgfx::setTexture(0, s_emit, texEmit);
 
     bgfx::setVertexBuffer(0, cubeVbh, 0, 36);
     bgfx::setState(0

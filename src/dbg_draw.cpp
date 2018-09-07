@@ -2,7 +2,7 @@
 #include "utils.h"
 #include "static_mesh.h"
 
-static PosColorVertex s_cubeVertData[] =
+static PosColorNormalVertex s_cubeVertData[] =
 {
     // left
     { 0.0f, 0.0f, 0.0f, 0xffffff00, -1.0f, 0.0f, 0.0f },
@@ -83,18 +83,18 @@ struct DbgDraw
 
         cubeVbh = bgfx::createVertexBuffer(
                     bgfx::makeRef(s_cubeVertData, sizeof(s_cubeVertData)),
-                    PosColorVertex::ms_decl
+                    PosColorNormalVertex::ms_decl
                     );
 
         instDataObb.reserve(2048);
         instDataSphere.reserve(2048);
 
-        static PosColorVertex sphereVertData[8192];
+        static PosColorNormalVertex sphereVertData[8192];
         makeSphere(sphereVertData, arr_count(sphereVertData), &sphereVertCount);
 
         sphereVbh = bgfx::createVertexBuffer(
                     bgfx::makeRef(sphereVertData, sizeof(sphereVertData)),
-                    PosColorVertex::ms_decl
+                    PosColorNormalVertex::ms_decl
                     );
 
         return true;

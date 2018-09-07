@@ -1,5 +1,5 @@
-$input a_position, a_normal, i_data0, i_data1, i_data2, i_data3, i_data4
-$output v_position, v_normal, v_color0
+$input a_position, a_normal, a_texcoord0, i_data0, i_data1, i_data2, i_data3, i_data4
+$output v_position, v_normal, v_color0, v_texcoord0
 
 #include "common.sh"
 
@@ -18,4 +18,5 @@ void main()
     
 	v_normal = worldNormal;
 	v_position = worldPos;
+    v_texcoord0 = a_texcoord0;
 }

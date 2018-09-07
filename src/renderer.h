@@ -8,7 +8,7 @@
 #define SHADOW_MAP_COUNT_MAX 8
 
 // TODO: move this
-struct PosColorVertex
+struct PosColorNormalVertex
 {
     f32 x, y, z;
     u32 color_abgr;
@@ -145,6 +145,7 @@ struct Renderer
     bgfx::UniformHandle u_lightColor2;
     bgfx::UniformHandle u_lightParams;
     bgfx::UniformHandle u_exposure;
+    bgfx::UniformHandle s_emit;
 
     bgfx::VertexBufferHandle cubeVbh;
     bgfx::VertexBufferHandle originVbh;
@@ -152,6 +153,12 @@ struct Renderer
     bgfx::VertexBufferHandle vbhScreenQuad;
 
     bgfx::FrameBufferHandle fbhGbuffer;
+    bgfx::TextureHandle texGbuff_albedo;
+    bgfx::TextureHandle texGbuff_emit;
+    bgfx::TextureHandle texGbuff_specular;
+    bgfx::TextureHandle texGbuff_normal;
+    bgfx::TextureHandle texGbuff_position;
+    bgfx::TextureHandle texGbuff_depth;
 
     bgfx::FrameBufferHandle fbhShadowMap[SHADOW_MAP_COUNT_MAX];
     bgfx::TextureHandle texShadowMap[SHADOW_MAP_COUNT_MAX];
@@ -161,6 +168,8 @@ struct Renderer
 
     bgfx::TextureHandle fbTexCombine;
     bgfx::FrameBufferHandle fbhCombine;
+
+    bgfx::TextureHandle texEmit;
 
     bool8 caps_shadowSamplerSupported;
 

@@ -1,5 +1,8 @@
 #include "utils.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 const bgfx::Memory* loadMem(bx::FileReaderI* _reader, const char* _filePath)
 {
     if(bx::open(_reader, _filePath)) {
@@ -88,4 +91,20 @@ f64 randRange(f64 min, f64 max)
 void randSetSeed(u32 seed)
 {
     state32 = seed;
+}
+
+// TODO: image struct with width and height
+u8* loadImageRGBA8(const char* filename)
+{
+    i32 x,y,n;
+    u8* data = stbi_load(filename, &x, &y, &n, 4);
+    if(!data) {
+        LOG("ERROR> could not open '%s'", filename);
+    }
+    return data;
+}
+
+void freeImage(u8* imgData)
+{
+    stbi_image_free(imgData);
 }

@@ -518,6 +518,8 @@ void GameData::update(f64 delta)
     ImGui::Image(bgfx::getTexture(rdr.fbhGbuffer, 1), ImVec2(300, 300 * (9.0f/16.0f)));
     ImGui::SameLine();
     ImGui::Image(bgfx::getTexture(rdr.fbhGbuffer, 2), ImVec2(300, 300 * (9.0f/16.0f)));
+
+    ImGui::Image(bgfx::getTexture(rdr.fbhGbuffer, 3), ImVec2(300, 300 * (9.0f/16.0f)));
     ImGui::SameLine();
     ImGui::Image(rdr.fbTexLight, ImVec2(300, 300 * (9.0f/16.0f)));
     ImGui::SameLine();

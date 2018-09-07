@@ -248,3 +248,6 @@ inline void strToLower(const char* src, const i32 len, char* dest)
     }
 }
 
+u8* loadImageRGBA8(const char* filename);
+void freeImage(u8* imgData);
+
