@@ -398,6 +398,19 @@ bool Renderer::init(i32 renderWidth_, i32 renderHeight_)
                                     mem);
     //freeImage(emitImgData);
 
+    // none emit texture
+    static u8 dataZero[1024] = {0};
+    const bgfx::Memory* memZero = bgfx::makeRef(dataZero, sizeof(dataZero));
+
+    texEmitNone = bgfx::createTexture2D(16, 16,
+                                        false, 1, bgfx::TextureFormat::RGBA8, 0
+                                        | BGFX_TEXTURE_MIN_POINT
+                                        | BGFX_TEXTURE_MAG_POINT
+                                        | BGFX_TEXTURE_MIP_POINT
+                                        | BGFX_TEXTURE_U_CLAMP
+                                        | BGFX_TEXTURE_V_CLAMP,
+                                        memZero);
+
     return true;
 }
 
@@ -765,6 +778,7 @@ void Renderer::frame()
     bgfx::setVertexBuffer(0, vbhScreenQuad, 0, 6);
 
     bgfx::setTexture(0, s_albedo, texGbuff_albedo);
+    bgfx::setTexture(1, s_emit, texGbuff_emit);
     bgfx::setTexture(5, s_lightMap, fbTexLight);
     bgfx::submit(ViewID::COMBINE, progGameFinal);
 
@@ -789,10 +803,10 @@ void Renderer::frame()
     bgfx::frame();
 }
 
-void Renderer::drawMesh(MeshHandle hmesh, const mat4& mtxModel, const vec4& color)
+void Renderer::drawMesh(MeshHandle hmesh, const mat4& mtxModel, const vec4& color, bool unlit)
 {
     bgfx::setUniform(u_color, color);
-    bgfx::setTexture(0, s_emit, texEmit);
+    bgfx::setTexture(0, s_emit, unlit ? texEmit : texEmitNone);
 
     meshSubmit(hmesh, ViewID::GAME, progGbuffer,
                mtxModel, BGFX_STATE_MASK);
@@ -831,7 +845,7 @@ void Renderer::drawCubeInstances(const InstanceData* instData, const i32 cubeCou
 
         memmove(idb.data, instData, instanceStride * cubeCount);
 
-        bgfx::setTexture(0, s_emit, texEmit);
+        bgfx::setTexture(0, s_emit, texEmitNone);
         bgfx::setVertexBuffer(0, cubeVbh, 0, 36);
         bgfx::setInstanceDataBuffer(&idb);
 
@@ -877,7 +891,7 @@ void Renderer::drawCube(mat4 mtxModel, vec4 color)
 {
     bgfx::setTransform(mtxModel);
     bgfx::setUniform(u_color, color);
-    bgfx::setTexture(0, s_emit, texEmit);
+    bgfx::setTexture(0, s_emit, texEmitNone);
 
     bgfx::setVertexBuffer(0, cubeVbh, 0, 36);
     bgfx::setState(0

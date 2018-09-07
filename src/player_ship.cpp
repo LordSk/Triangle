@@ -190,12 +190,13 @@ void updateShipWeapon(EntityComponentSystem* ecs, CShipWeapon* eltList, const i3
             bx::vec3MulQuat(dx1, dx1, weapTf.rot);
             const vec2 dir = vec2Norm(vec3ToVec2(dx1));
 
-            bm.vel = dir * 60.0f;
+            bm.vel = dir * weap.bulletSpeed;
             assert(bm.vel.x == bm.vel.x);
             assert(bm.vel.y == bm.vel.y);
 
             meshComp.hMesh = weap.hMeshBullet;
             meshComp.color = weap.meshColor;
+            meshComp.unlit = true;
 
             quat baseRot;
             bx::quatRotateX(baseRot, -bx::kPiHalf);

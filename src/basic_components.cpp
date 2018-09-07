@@ -127,7 +127,7 @@ void updateDrawMesh(EntityComponentSystem* ecs, CDrawMesh* eltList, const i32 co
 
         mat4 mtxModel;
         finalTf.toMtx(&mtxModel);
-        rdr.drawMesh(dm.hMesh, mtxModel, dm.color);
+        rdr.drawMesh(dm.hMesh, mtxModel, dm.color, dm.unlit);
     }
 }
 

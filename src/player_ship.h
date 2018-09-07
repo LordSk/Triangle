@@ -18,6 +18,7 @@ struct CShipWeapon
 {
     f32 rateOfFire = 2.0f; // bullets per second
     f32 fireCd = 0.0f;
+    f32 bulletSpeed = 60.f;
     i32 dmgTeam = 0;
 
     //

@@ -54,6 +54,7 @@ struct CDrawMesh
     MeshHandle hMesh;
     Transform tf;
     vec4 color;
+    bool unlit = false;
 };
 
 //@Component

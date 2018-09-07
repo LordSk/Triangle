@@ -382,6 +382,32 @@ void GameData::componentDoUi(const i32 eid, const u64 compBit)
             ImGui::InputFloat3("area min", lp.worldArea.bmin.data);
             ImGui::InputFloat3("area max", lp.worldArea.bmax.data);
         } break;
+
+        case ComponentBit::DrawMesh: {
+            CDrawMesh& comp = ecs.getCompDrawMesh(eid);
+            Transform& tf = comp.tf;
+            ImGui::Text("Transform");
+            ImGui::InputFloat3("pos", tf.pos.data);
+            ImGui::InputFloat3("scale", tf.scale.data);
+            ImGui::InputFloat4("rot", tf.rot.data);
+
+            ImGui::Separator();
+
+            ImGui::ColorEdit4("color", comp.color.data);
+            ImGui::Checkbox("unlit", &comp.unlit);
+        } break;
+
+        case ComponentBit::ShipWeapon: {
+            CShipWeapon& comp = ecs.getCompShipWeapon(eid);
+            ImGui::InputFloat("rateOfFire", &comp.rateOfFire);
+            ImGui::InputFloat("fireCd", &comp.fireCd);
+            ImGui::InputFloat("bulletSpeed", &comp.bulletSpeed);
+            ImGui::InputInt("dmgTeam", &comp.dmgTeam);
+
+            ImGui::Separator();
+
+            ImGui::ColorEdit4("mesh_color", comp.meshColor.data);
+        } break;
     }
 }
 

@@ -170,6 +170,7 @@ struct Renderer
     bgfx::FrameBufferHandle fbhCombine;
 
     bgfx::TextureHandle texEmit;
+    bgfx::TextureHandle texEmitNone;
 
     bool8 caps_shadowSamplerSupported;
 
@@ -195,7 +196,7 @@ struct Renderer
     void setView(const mat4& proj, const mat4& view);
     void frame();
 
-    void drawMesh(MeshHandle hmesh, const mat4& mtxModel, const vec4& color);
+    void drawMesh(MeshHandle hmesh, const mat4& mtxModel, const vec4& color, bool unlit = false);
     void drawCubeInstances(const InstanceData* instData, const i32 cubeCount, const bool8 dropShadow);
     void drawCube(mat4 mtxModel, vec4 color);
 
