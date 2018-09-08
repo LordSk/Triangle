@@ -806,6 +806,8 @@ void Renderer::frame()
 void Renderer::drawMesh(MeshHandle hmesh, const mat4& mtxModel, const vec4& color, bool unlit)
 {
     bgfx::setUniform(u_color, color);
+
+    // TODO: pass in emit texture and emit intensity (uniform)
     bgfx::setTexture(0, s_emit, unlit ? texEmit : texEmitNone);
 
     meshSubmit(hmesh, ViewID::GAME, progGbuffer,

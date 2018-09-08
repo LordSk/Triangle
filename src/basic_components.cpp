@@ -25,56 +25,6 @@ void updatePhysBody(EntityComponentSystem* ecs, CPhysBody* eltList, const i32 co
     }
 }
 
-void updateDmgZone(EntityComponentSystem* ecs, CDmgZone* eltList, const i32 count, const i32* entityId,
-                   f64 delta, f64 physLerpAlpha)
-{
-    DamageFrame& dmgWorld = getDmgFrame();
-
-    for(i32 i = 0; i < count; i++) {
-        const i32 eid = entityId[i];
-        CDmgZone& dmgBody = eltList[i];
-        assert(ecs->entityCompBits[eid] & ComponentBit::Transform);
-        CTransform& tf = ecs->getCompTransform(eid);
-        dmgBody.collider.setPos(vec3ToVec2(tf.pos));
-    }
-
-    for(i32 i = 0; i < count; i++) {
-        const i32 eid = entityId[i];
-        CDmgZone& dmgBody = eltList[i];
-        DamageFrame::ZoneInfo zi;
-        zi.tag = dmgBody.tag;
-        zi.data = (void*)(intptr_t)eid;
-        dmgWorld.registerZone((DamageTeam::Enum)dmgBody.team, dmgBody.collider, zi);
-    }
-
-    dmgWorld.resolveIntersections();
-
-    DamageFrame::IntersectInfo* lastFrameInterList = dmgWorld.intersectList.data();
-    const i32 lastFrameInterCount = dmgWorld.intersectList.count();
-
-    for(i32 i = 0; i < count; i++) {
-        const i32 eid = entityId[i];
-        CDmgZone& dmgBody = eltList[i];
-        dmgBody.lastFrameInterList = {};
-
-        for(i32 j = 0; j < lastFrameInterCount; j++) {
-            const DamageFrame::IntersectInfo& info = lastFrameInterList[j];
-            if(info.team1 == dmgBody.team && (intptr_t)info.zone1.data == eid) {
-                if(dmgBody.lastFrameInterList.data == nullptr) {
-                    dmgBody.lastFrameInterList.data = &lastFrameInterList[j];
-                    dmgBody.lastFrameInterList.count = 1;
-                }
-                else {
-                    dmgBody.lastFrameInterList.count++;
-                }
-            }
-            else if(dmgBody.lastFrameInterList.data) {
-                break;
-            }
-        }
-    }
-}
-
 void updateEnemyBasicMovement(EntityComponentSystem* ecs, CEnemyBasicMovement* eltList, const i32 count,
                         const i32* entityId, f64 delta, f64 physLerpAlpha)
 {
@@ -240,11 +190,6 @@ void onDeletePhysBody(EntityComponentSystem* ecs, CPhysBody* eltList, const i32 
     }
 }
 
-void onDeleteDmgZone(EntityComponentSystem* ecs, CDmgZone* eltList, const i32 count,
-                     const i32* entityId, bool8* entDeleteFlag)
-{
-}
-
 void onDeleteEnemyBasicMovement(EntityComponentSystem* ecs, CEnemyBasicMovement* eltList, const i32 count
                           ,const i32* entityId, bool8* entDeleteFlag)
 {
@@ -288,19 +233,41 @@ void updateHealthCore(EntityComponentSystem* ecs, CHealthCore* eltList, const i3
             mesh.color = vec4{0, alpha, 1, 1};
         }
 
-        CDmgZone& dmgZone = ecs->getCompDmgZone(eid);
-        const i32 interCount = dmgZone.lastFrameInterList.count;
+        CDamageCollider& DamageCollider = ecs->getCompDamageCollider(eid);
+        const i32 interCount = DamageCollider.dmgEventQueue.count();
         if(!interCount) continue;
 
+        u32 singleUID[128];
+        i32 singleCount = 0;
+
         for(i32 j = 0; j < interCount; j++) {
-            if(dmgZone.lastFrameInterList[j].team2 == DamageTeam::NEUTRAL) {
-                continue;
+            const DamageEvent& event = DamageCollider.dmgEventQueue[j];
+            if(!event.flags) continue;
+
+            if(event.flags & DamageFlag::SingleInstance) {
+                bool found = false;
+                for(i32 s = 0; s < singleCount && !found; s++) {
+                    if(singleUID[s] == event.fromEntityUID) {
+                        found = true;
+                    }
+                }
+
+                if(found) {
+                    continue;
+                }
+                else {
+                    singleUID[singleCount++] = event.fromEntityUID;
+                    assert(singleCount < 128);
+                }
             }
-            core.health -= 10;
-            if(core.health <= 0) {
+
+            core.health -= event.dmg;
+            if(core.health <= 0.0f) {
                 ecs->deleteEntity(eid);
             }
         }
+
+        DamageCollider.dmgEventQueue.clear();
     }
 }
 
@@ -316,13 +283,14 @@ void updateBulletLogic(EntityComponentSystem* ecs, CBulletLogic* eltList, const 
     for(i32 i = 0; i < count; i++) {
         CBulletLogic& bl = eltList[i];
         const i32 eid = entityId[i];
-        CDmgZone& dmgZone = ecs->getCompDmgZone(eid);
+        CDamageCollider& DamageCollider = ecs->getCompDamageCollider(eid);
 
-        const i32 interCount = dmgZone.lastFrameInterList.count;
+        const i32 interCount = DamageCollider.dmgEventQueue.count();
         for(i32 j = 0; j < interCount; j++) {
             ecs->deleteEntity(eid);
             break;
         }
+        DamageCollider.dmgEventQueue.clear();
     }
 }
 

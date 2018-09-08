@@ -85,3 +85,10 @@ inline bx::AllocatorI* getDefaultAllocator()
 
 #define PHYS_UPDATE_DELTA (1.0 / 120.0)
 
+inline u64 alignU64(u64 u, u64 a)
+{
+    if(a < 2) return u;
+    u64 r = u % a;
+    return r ? u + (a - r) : u;
+}
+

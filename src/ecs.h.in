@@ -21,6 +21,9 @@ struct EntityComponentSystem
     char entityName[MAX_ENTITIES][32];
     bool8 entityAlive[MAX_ENTITIES] = {0};
     bool8 entityDeleteFlag[MAX_ENTITIES] = {0};
+    u32 entityUID[MAX_ENTITIES] = {0};
+    u32 entityUIDNext = 1;
+    
 %%ARRAY_COMPONENT%%
 
     i32 createEntity(const char* name = "Entity");

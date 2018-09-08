@@ -9,6 +9,7 @@ i32 EntityComponentSystem::createEntity(const char* name)
     for(i32 i = 0; i < MAX_ENTITIES; ++i) {
         if(entityAlive[i] == false) {
             entityAlive[i] = true;
+            entityUID[i] = entityUIDNext++;
             memmove(entityName[i], name, sizeof(entityName[i]));
             return i;
         }

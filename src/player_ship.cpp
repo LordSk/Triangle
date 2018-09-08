@@ -122,21 +122,22 @@ void updatePlayerShipMovement(EntityComponentSystem* ecs, CPlayerShipMovement* e
         const i32 eid = entityId[i];
 
         assert(ecs->entityCompBits[eid] & ComponentBit::PhysBody);
-        assert(ecs->entityCompBits[eid] & ComponentBit::DmgZone);
-        CDmgZone& dmgZone = ecs->getCompDmgZone(eid);
+        assert(ecs->entityCompBits[eid] & ComponentBit::DamageCollider);
+        CDamageCollider& DamageCollider = ecs->getCompDamageCollider(eid);
         CPhysBody& cpb = ecs->getCompPhysBody(eid);
         PhysBody& physBody = physWorld.bodyDyn[cpb.bodyId];
 
-        const i32 interCount = dmgZone.lastFrameInterList.count;
+        const i32 interCount = DamageCollider.dmgEventQueue.count();
         for(i32 j = 0; j < interCount; j++) {
             /*LOG("+-- %d %lld | %d %lld",
-                dmgZone.lastFrameInterList[j].team1,
-                (intptr_t)dmgZone.lastFrameInterList[j].zone1.data,
-                dmgZone.lastFrameInterList[j].team2,
-                (intptr_t)dmgZone.lastFrameInterList[j].zone2.data
+                DamageCollider.lastFrameInterList[j].team1,
+                (intptr_t)DamageCollider.lastFrameInterList[j].zone1.data,
+                DamageCollider.lastFrameInterList[j].team2,
+                (intptr_t)DamageCollider.lastFrameInterList[j].zone2.data
                 );*/
-            physBody.vel -= vec2Norm(dmgZone.lastFrameInterList[j].collisionInfo.penVec) * 5;
+            physBody.vel -= vec2Norm(DamageCollider.dmgEventQueue[j].collisionInfo.penVec) * 5;
         }
+        DamageCollider.dmgEventQueue.clear();
     }
 }
 
@@ -167,8 +168,8 @@ void updateShipWeapon(EntityComponentSystem* ecs, CShipWeapon* eltList, const i3
             const i32 bid = ecs->createEntity("Bullet");
             CTransform& bulletTf = ecs->addCompTransform(bid);
             CBulletMovement& bm = ecs->addCompBulletMovement(bid);
-            CDmgZone& dmgBody = ecs->addCompDmgZone(bid);
-            CDrawMesh& meshComp = ecs->addCompDrawMesh(bid);
+            CDamageCollider& dmgBody = ecs->addCompDamageCollider(bid);
+            CDrawMesh& bulletMeshComp = ecs->addCompDrawMesh(bid);
             CBulletLogic& bulletLogic = ecs->addCompBulletLogic(bid);
             CLightPoint& bulletLight =  ecs->addCompLightPoint(bid);
 
@@ -182,7 +183,8 @@ void updateShipWeapon(EntityComponentSystem* ecs, CShipWeapon* eltList, const i3
             bulletCol.makeCb(CircleBound{{}, 0.7f});
             dmgBody.collider = bulletCol;
             dmgBody.team = weap.dmgTeam;
-            dmgBody.tag = bid;
+            dmgBody.core.dmg = 10;
+            dmgBody.core.flags = DamageFlag::SingleInstance;
 
             // hacky to get direction
             // TODO: do better
@@ -194,16 +196,16 @@ void updateShipWeapon(EntityComponentSystem* ecs, CShipWeapon* eltList, const i3
             assert(bm.vel.x == bm.vel.x);
             assert(bm.vel.y == bm.vel.y);
 
-            meshComp.hMesh = weap.hMeshBullet;
-            meshComp.color = weap.meshColor;
-            meshComp.unlit = true;
+            bulletMeshComp.hMesh = weap.hMeshBullet;
+            bulletMeshComp.color = weap.meshColor;
+            bulletMeshComp.unlit = true;
 
             quat baseRot;
             bx::quatRotateX(baseRot, -bx::kPiHalf);
             quat rotZ;
             bx::quatRotateZ(rotZ, -bx::kPiHalf);
-            bx::quatMul(meshComp.tf.rot, baseRot, rotZ);
-            meshComp.tf.scale = vec3Splat(0.5);
+            bx::quatMul(bulletMeshComp.tf.rot, baseRot, rotZ);
+            bulletMeshComp.tf.scale = vec3Splat(0.5);
 
             vec3 color = vec4ToVec3(weap.meshColor);
             bulletLight.color1 = vec3Norm(color + vec3Splat(0.2));

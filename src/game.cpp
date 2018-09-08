@@ -180,8 +180,8 @@ void Room::addWallsToDamageFrame()
     const Collider* walls = wallColliders.data();
 
     for(i32 i = 0; i < wallCount; ++i) {
-        DamageFrame::ZoneInfo zi = {};
-        df.registerZone(DamageTeam::NEUTRAL, walls[i], zi);
+        DamageCore zi = {};
+        df.registerCollider(DamageTeam::NEUTRAL, walls[i], zi);
     }
 }
 
@@ -209,7 +209,7 @@ bool GameData::init()
     playerEid = ecs.createEntity("PlayerShip");
     CTransform& playerTf = ecs.addCompTransform(playerEid);
     CPhysBody& playerPhysBody = ecs.addCompPhysBody(playerEid);
-    CDmgZone& playerDmgBody = ecs.addCompDmgZone(playerEid);
+    CDamageCollider& playerDmgBody = ecs.addCompDamageCollider(playerEid);
     CDrawMesh& playerMesh = ecs.addCompDrawMesh(playerEid);
     CShipInput& playerInput = ecs.addCompShipInput(playerEid);
     CShipControllerHuman& playerController = ecs.addCompShipControllerHuman(playerEid);
@@ -255,7 +255,7 @@ bool GameData::init()
         const i32 eid = ecs.createEntity("BasicEnemy");
         CTransform& tf = ecs.addCompTransform(eid);
         CPhysBody& physBody = ecs.addCompPhysBody(eid);
-        CDmgZone& dmgBody = ecs.addCompDmgZone(eid);
+        CDamageCollider& dmgBody = ecs.addCompDamageCollider(eid);
         CDrawMesh& mesh = ecs.addCompDrawMesh(eid);
         ecs.addCompShipInput(eid);
         ecs.addCompShipControllerAi(eid);
@@ -333,7 +333,11 @@ void GameData::handlEvent(const SDL_Event& event)
             return;
         }
         if(event.key.keysym.sym == SDLK_b) {
-            dbgEnableDmgZones ^= 1;
+            dbgEnableDamageColliders ^= 1;
+            return;
+        }
+        if(event.key.keysym.sym == SDLK_p) {
+            dbgPaused ^= 1;
             return;
         }
     }
@@ -408,11 +412,28 @@ void GameData::componentDoUi(const i32 eid, const u64 compBit)
 
             ImGui::ColorEdit4("mesh_color", comp.meshColor.data);
         } break;
+
+        case ComponentBit::DamageCollider: {
+            CDamageCollider& comp = ecs.getCompDamageCollider(eid);
+            ImGui::InputInt("team", &comp.team);
+            ImGui::InputFloat("dmg", &comp.core.dmg);
+            ImGui::InputScalar("flags", ImGuiDataType_U32, &comp.core.flags);
+        } break;
+
+        case ComponentBit::HealthCore: {
+            CHealthCore& comp = ecs.getCompHealthCore(eid);
+            ImGui::InputFloat("health", &comp.health);
+            ImGui::InputFloat("healthMax", &comp.healthMax);
+        } break;
     }
 }
 
 void GameData::update(f64 delta)
 {
+    if(dbgPaused) {
+        delta = FLT_MIN;
+    }
+
     Renderer& rdr = getRenderer();
     time += delta;
 
@@ -431,14 +452,15 @@ void GameData::update(f64 delta)
     const f64 physLerpAlpha = physWorldTimeAcc / PHYS_UPDATE_DELTA;
 
     DamageFrame& dmgWorld = getDmgFrame();
-    dmgWorld.clearZones();
+    dmgWorld.clearFrame();
 
     room.addWallsToDamageFrame();
 
     ecs.removeFlaggedForDeletion();
     ecs.update(delta, physLerpAlpha);
 
-    if(dbgEnableDmgZones) {
+
+    if(dbgEnableDamageColliders) {
        dmgWorld.dbgDraw();
     }
 
@@ -521,6 +543,7 @@ void GameData::update(f64 delta)
 
             if(compBits != 0) {
                 if(ImGui::TreeNode(entityStr)) {
+                    ImGui::TextColored(ImVec4{0.8f, 0, 0, 1}, "UID: %llu", ecs.entityUID[i]);
                     for(i32 c = 0; c < 64; c++) {
                         if(compBits & (u64(1) << c)) {
                             if(ImGui::TreeNode(ComponentBit::Names[c])) {

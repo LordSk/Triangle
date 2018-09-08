@@ -196,16 +196,16 @@ void handleEvent(const SDL_Event& event)
             SDL_WarpMouseInWindow(window, WINDOW_WIDTH/2, WINDOW_HEIGHT/2);
             return;
         }
-        if(event.key.keysym.sym == SDLK_x) {
+        if(event.key.keysym.sym == SDLK_x && mouseCaptured) {
             showUI ^= 1;
             return;
         }
-        if(event.key.keysym.sym == SDLK_v) {
+        if(event.key.keysym.sym == SDLK_v && mouseCaptured) {
             renderer.dbgEnableGrid ^= 1;
             renderer.dbgEnableWorldOrigin ^= 1;
             return;
         }
-        if(event.key.keysym.sym == SDLK_p) {
+        if(event.key.keysym.sym == SDLK_n && mouseCaptured) {
             renderer.dbgEnableDbgPhysics ^= 1;
             return;
         }
@@ -243,12 +243,16 @@ void updateUI(f64 delta)
             im::Checkbox("Enable grid", &renderer.dbgEnableGrid);
             im::Checkbox("Enable world origin", &renderer.dbgEnableWorldOrigin);
             im::Checkbox("Enable debug physics", &renderer.dbgEnableDbgPhysics);
-            im::Checkbox("Enable debug damage zones", &game.dbgEnableDmgZones);
+            im::Checkbox("Enable debug damage zones", &game.dbgEnableDamageColliders);
             im::Checkbox("Enable light bound boxes", &rdr.dbgLightBoundingBox);
             im::EndMenu();
         }
         if(im::BeginMenu("Renderer")) {
             rdr.dbgDoMenuBar();
+            im::EndMenu();
+        }
+        if(im::BeginMenu("Game")) {
+            im::Checkbox("Paused", &game.dbgPaused);
             im::EndMenu();
         }
 

@@ -59,6 +59,13 @@ struct Collider
     }
 };
 
+template<typename Payload>
+struct ColliderWithPayload
+{
+    Collider collider;
+    Payload payload;
+};
+
 struct CollisionInfo
 {
     vec2 penVec;

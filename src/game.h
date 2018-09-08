@@ -91,7 +91,8 @@ struct GameData
     CameraFreeFlight camFreeView;
 
     f32 dbgPlayerCamHeight = 30;
-    bool dbgEnableDmgZones = false;
+    bool dbgEnableDamageColliders = false;
+    bool dbgPaused = false;
 
     MeshHandle meshPlayerShip;
     MeshHandle meshEyeEn1;

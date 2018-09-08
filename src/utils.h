@@ -14,6 +14,12 @@ struct Array: public std::vector<T>
         return *(end()-1);
     }
 
+    inline void pushMany(const T* elems, const i32 count) {
+        for(i32 i = 0; i < count; i++) {
+            push(elems[i]);
+        }
+    }
+
     inline void pop() {
         std::vector<T>::pop_back();
     }

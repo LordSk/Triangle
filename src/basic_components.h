@@ -30,18 +30,6 @@ struct CPhysBody
     }
 };
 
-// this order thing is not that great, but it works for now
-//@Component(order=1)
-struct CDmgZone
-{
-    typedef i32 DamageWorldTeam;
-    DamageWorldTeam team;
-    Collider collider;
-    i32 tag = 0;
-    void* userData = nullptr;
-    ArraySlice<DamageFrame::IntersectInfo> lastFrameInterList = {};
-};
-
 //@Component
 struct CEnemyBasicMovement
 {
@@ -139,8 +127,6 @@ void updateTransform(struct EntityComponentSystem* ecs, CTransform* eltList, con
                     f64 delta, f64 physLerpAlpha);
 void updatePhysBody(struct EntityComponentSystem* ecs, CPhysBody* eltList, const i32 count,const i32* entityId,
                     f64 delta, f64 physLerpAlpha);
-void updateDmgZone(struct EntityComponentSystem* ecs, CDmgZone* eltList, const i32 count,const i32* entityId,
-                   f64 delta, f64 physLerpAlpha);
 void updateEnemyBasicMovement(struct EntityComponentSystem* ecs, CEnemyBasicMovement* eltList,
                                const i32 count, const i32* entityId, f64 delta, f64 physLerpAlpha);
 void updateDrawMesh(struct EntityComponentSystem* ecs, CDrawMesh* eltList, const i32 count,
@@ -158,8 +144,6 @@ void onDeleteTransform(struct EntityComponentSystem* ecs, CTransform* eltList, c
                       const i32* entityId, bool8* entDeleteFlag);
 void onDeletePhysBody(struct EntityComponentSystem* ecs, CPhysBody* eltList, const i32 count,
                      const i32* entityId, bool8* entDeleteFlag);
-void onDeleteDmgZone(struct EntityComponentSystem* ecs, CDmgZone* eltList, const i32 count,
-                      const i32* entityId, bool8* entDeleteFlag);
 void onDeleteEnemyBasicMovement(struct EntityComponentSystem* ecs, CEnemyBasicMovement* eltList,
                                 const i32 count, const i32* entityId, bool8* entDeleteFlag);
 void onDeleteDrawMesh(struct EntityComponentSystem* ecs, CDrawMesh* eltList, const i32 count,
